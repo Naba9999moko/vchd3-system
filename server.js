@@ -13,7 +13,9 @@ const { randomUUID } = require("crypto");
 
 const app = express();
 app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 3000;
+const BUCKET = "vchd3-files";
 
 if (
   !process.env.DATABASE_URL ||
@@ -36,8 +38,6 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-const BUCKET = "vchd3-files";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -86,6 +86,7 @@ app.use(session({
   }
 }));
 
+// Өгөгдлийн сан болон Үндсэн админ
 async function setupDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -116,32 +117,46 @@ async function setupDatabase() {
     NOT NULL DEFAULT '[]'::jsonb
   `);
 
-  const adminPhone = process.env.ADMIN_PHONE;
+  const adminPhone = process.env.ADMIN_PHONE?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (adminPhone && adminPassword) {
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE phone = $1",
-      [adminPhone]
-    );
-
-    if (existing.rowCount === 0) {
-      const hash = await bcrypt.hash(adminPassword, 12);
-
-      await pool.query(
-        `INSERT INTO users
-         (fullname, phone, password, role, status)
-         VALUES ($1, $2, $3, 'superadmin', 'approved')`,
-        [
-          process.env.ADMIN_NAME || "Үндсэн админ",
-          adminPhone,
-          hash
-        ]
-      );
-    }
+  if (!adminPhone || !adminPassword) {
+    throw new Error("ADMIN_PHONE эсвэл ADMIN_PASSWORD тохируулаагүй байна.");
   }
+
+  const hash = await bcrypt.hash(adminPassword, 12);
+
+  const existing = await pool.query(
+    "SELECT id FROM users WHERE phone = $1",
+    [adminPhone]
+  );
+
+  if (existing.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO users
+       (fullname, phone, password, role, status)
+       VALUES ($1, $2, $3, 'superadmin', 'approved')`,
+      [
+        process.env.ADMIN_NAME || "Үндсэн админ",
+        adminPhone,
+        hash
+      ]
+    );
+  } else {
+    await pool.query(
+      `UPDATE users
+       SET role = 'superadmin',
+           status = 'approved',
+           password = $1
+       WHERE phone = $2`,
+      [hash, adminPhone]
+    );
+  }
+
+  console.log("Үндсэн админы эрх тохируулагдлаа.");
 }
 
+// Нэвтрэх эрх шалгах
 function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.status(401).json({
@@ -181,8 +196,8 @@ app.post("/api/register", async (req, res) => {
     const { fullname, phone, password } = req.body;
 
     if (
-      !fullname ||
-      !phone ||
+      !fullname?.trim() ||
+      !phone?.trim() ||
       !password ||
       password.length < 8
     ) {
@@ -219,7 +234,8 @@ app.post("/api/register", async (req, res) => {
 // Нэвтрэх
 app.post("/api/login", async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const phone = req.body.phone?.trim();
+    const { password } = req.body;
 
     const result = await pool.query(
       "SELECT * FROM users WHERE phone = $1",
@@ -233,7 +249,7 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(password || "", user.password);
 
     if (!valid) {
       return res.status(401).json({
@@ -247,15 +263,33 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    req.session.user = {
-      id: user.id,
-      fullname: user.fullname,
-      role: user.role
-    };
+    req.session.regenerate((error) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).json({
+          message: "Нэвтрэхэд алдаа гарлаа."
+        });
+      }
 
-    res.json({
-      message: "Амжилттай нэвтэрлээ.",
-      user: req.session.user
+      req.session.user = {
+        id: user.id,
+        fullname: user.fullname,
+        role: user.role
+      };
+
+      req.session.save((saveError) => {
+        if (saveError) {
+          console.error(saveError);
+          return res.status(500).json({
+            message: "Нэвтрэхэд алдаа гарлаа."
+          });
+        }
+
+        res.json({
+          message: "Амжилттай нэвтэрлээ.",
+          user: req.session.user
+        });
+      });
     });
   } catch (error) {
     console.error(error);
@@ -265,86 +299,144 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Гарах
+// Системээс гарах
 app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => {
+  req.session.destroy((error) => {
+    if (error) {
+      return res.status(500).json({
+        message: "Гарахад алдаа гарлаа."
+      });
+    }
+
+    res.clearCookie("connect.sid");
     res.json({ message: "Системээс гарлаа." });
   });
 });
 
 // Одоогийн хэрэглэгч
 app.get("/api/me", (req, res) => {
-  res.json({ user: req.session.user || null });
+  res.json({
+    user: req.session.user || null
+  });
 });
 
 // Хэрэглэгчдийн жагсаалт
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
-  const result = await pool.query(
-    `SELECT id, fullname, phone, role, status, created_at
-     FROM users
-     ORDER BY created_at DESC`
-  );
+  try {
+    const result = await pool.query(
+      `SELECT id, fullname, phone, role, status, created_at
+       FROM users
+       ORDER BY created_at DESC`
+    );
 
-  res.json(result.rows);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Хэрэглэгчдийн мэдээлэл авахад алдаа гарлаа."
+    });
+  }
 });
 
 // Бүртгэл зөвшөөрөх / татгалзах
 app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
-  const { status } = req.body;
+  try {
+    const { status } = req.body;
 
-  if (!["approved", "rejected"].includes(status)) {
-    return res.status(400).json({
-      message: "Төлөв буруу байна."
+    if (!["approved", "rejected"].includes(status)) {
+      return res.status(400).json({
+        message: "Төлөв буруу байна."
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET status = $1
+       WHERE id = $2 AND role = 'employee'
+       RETURNING id`,
+      [status, req.params.id]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({
+        message: "Ажилтны бүртгэл олдсонгүй."
+      });
+    }
+
+    res.json({
+      message: "Бүртгэлийн төлөв шинэчлэгдлээ."
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Төлөв шинэчлэхэд алдаа гарлаа."
     });
   }
-
-  await pool.query(
-    "UPDATE users SET status = $1 WHERE id = $2 AND role = 'employee'",
-    [status, req.params.id]
-  );
-
-  res.json({
-    message: "Бүртгэлийн төлөв шинэчлэгдлээ."
-  });
 });
 
 // Үндсэн админ админ томилох
-app.patch("/api/superadmin/promote/:id", requireSuperAdmin, async (req, res) => {
-  const result = await pool.query(
-    `UPDATE users
-     SET role = 'admin'
-     WHERE id = $1 AND status = 'approved' AND role = 'employee'
-     RETURNING id`,
-    [req.params.id]
-  );
+app.patch(
+  "/api/superadmin/promote/:id",
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE users
+         SET role = 'admin'
+         WHERE id = $1
+           AND status = 'approved'
+           AND role = 'employee'
+         RETURNING id`,
+        [req.params.id]
+      );
 
-  if (!result.rowCount) {
-    return res.status(400).json({
-      message: "Зөвшөөрөгдсөн ажилтны бүртгэл олдсонгүй."
-    });
+      if (!result.rowCount) {
+        return res.status(400).json({
+          message: "Зөвшөөрөгдсөн ажилтны бүртгэл олдсонгүй."
+        });
+      }
+
+      res.json({ message: "Админаар томиллоо." });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        message: "Админ томилоход алдаа гарлаа."
+      });
+    }
   }
-
-  res.json({ message: "Админаар томиллоо." });
-});
+);
 
 // Үндсэн админ админы эрх цуцлах
-app.patch("/api/superadmin/demote/:id", requireSuperAdmin, async (req, res) => {
-  const result = await pool.query(
-    `UPDATE users
-     SET role = 'employee'
-     WHERE id = $1 AND role = 'admin'
-     RETURNING id`,
-    [req.params.id]
-  );
+app.patch(
+  "/api/superadmin/demote/:id",
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE users
+         SET role = 'employee'
+         WHERE id = $1 AND role = 'admin'
+         RETURNING id`,
+        [req.params.id]
+      );
 
-  if (!result.rowCount) {
-    return res.status(400).json({
-      message: "Админ олдсонгүй."
-    });
+      if (!result.rowCount) {
+        return res.status(400).json({
+          message: "Админ олдсонгүй."
+        });
+      }
+
+      res.json({
+        message: "Админы эрхийг цуцаллаа."
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        message: "Админы эрх цуцлахад алдаа гарлаа."
+      });
+    }
   }
-
-  res.json({ message: "Админы эрхийг цуцаллаа." });
-});
+);
 
 // Мэдээлэл оруулах: PDF болон зураг хавсаргах
 app.post(
@@ -352,6 +444,7 @@ app.post(
   requireAdmin,
   upload.array("files", 10),
   async (req, res) => {
+    let postId = null;
     const uploadedPaths = [];
 
     try {
@@ -364,7 +457,11 @@ app.post(
         "ХАБЭА"
       ];
 
-      if (!allowed.includes(category) || !title || !content) {
+      if (
+        !allowed.includes(category) ||
+        !title?.trim() ||
+        !content?.trim()
+      ) {
         return res.status(400).json({
           message: "Мэдээллээ бүрэн оруулна уу."
         });
@@ -375,10 +472,15 @@ app.post(
          (category, title, content, author_id)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [category, title, content, req.session.user.id]
+        [
+          category,
+          title.trim(),
+          content.trim(),
+          req.session.user.id
+        ]
       );
 
-      const postId = result.rows[0].id;
+      postId = result.rows[0].id;
       const attachments = [];
 
       for (const file of req.files || []) {
@@ -423,7 +525,15 @@ app.post(
       if (uploadedPaths.length) {
         await supabase.storage
           .from(BUCKET)
-          .remove(uploadedPaths);
+          .remove(uploadedPaths)
+          .catch(console.error);
+      }
+
+      if (postId) {
+        await pool.query(
+          "DELETE FROM posts WHERE id = $1",
+          [postId]
+        ).catch(console.error);
       }
 
       res.status(500).json({
@@ -435,11 +545,18 @@ app.post(
 
 // Мэдээлэл харах
 app.get("/api/posts", requireLogin, async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM posts ORDER BY created_at DESC"
-  );
+  try {
+    const result = await pool.query(
+      "SELECT * FROM posts ORDER BY created_at DESC"
+    );
 
-  res.json(result.rows);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Мэдээлэл авахад алдаа гарлаа."
+    });
+  }
 });
 
 // Хавсаргасан файл нээх / татах
@@ -476,7 +593,7 @@ app.get(
 
       const { data, error } = await supabase.storage
         .from(BUCKET)
-        .createSignedUrl(file.path, 60 * 5);
+        .createSignedUrl(file.path, 300);
 
       if (error) throw error;
 
@@ -492,16 +609,18 @@ app.get(
 
 // Нүүр хуудас
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
 });
 
-// Multer болон бусад алдааг боловсруулах
+// Файл болон бусад алдааг боловсруулах
 app.use((error, req, res, next) => {
   console.error(error);
 
   if (error instanceof multer.MulterError) {
     return res.status(400).json({
-      message: "Файлын хэмжээ 10MB-аас ихгүй, нийт 10 хүртэл файл оруулна уу."
+      message: "Файл тус бүр 10MB-аас ихгүй, нийт 10 хүртэл файл оруулна уу."
     });
   }
 
