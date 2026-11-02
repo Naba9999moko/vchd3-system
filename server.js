@@ -1,3 +1,4 @@
+
 const express = require("express");
 const path = require("path");
 const { Pool } = require("pg");
@@ -55,7 +56,6 @@ const upload = multer({
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(null, false);
       cb(new Error("Зөвхөн PDF болон зураг оруулна уу."));
     }
   }
@@ -86,6 +86,7 @@ app.use(session({
   }
 }));
 
+// ӨГӨГДЛИЙН САН
 async function setupDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -114,6 +115,19 @@ async function setupDatabase() {
     ALTER TABLE posts
     ADD COLUMN IF NOT EXISTS attachments JSONB
     NOT NULL DEFAULT '[]'::jsonb
+  `);
+
+  // ТАНИЛЦСАН БҮРТГЭЛ
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS post_acknowledgements (
+      id SERIAL PRIMARY KEY,
+      post_id INTEGER NOT NULL
+        REFERENCES posts(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+      acknowledged_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(post_id, user_id)
+    )
   `);
 
   const adminPhone = process.env.ADMIN_PHONE?.trim();
@@ -152,16 +166,16 @@ async function setupDatabase() {
     );
   }
 
-  console.log("Үндсэн админы эрх тохируулагдлаа.");
+  console.log("Өгөгдлийн сан бэлэн боллоо.");
 }
 
+// ЭРХ ШАЛГАХ
 function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.status(401).json({
       message: "Нэвтэрнэ үү."
     });
   }
-
   next();
 }
 
@@ -174,7 +188,6 @@ function requireAdmin(req, res, next) {
       message: "Админы эрх шаардлагатай."
     });
   }
-
   next();
 }
 
@@ -187,7 +200,6 @@ function requireSuperAdmin(req, res, next) {
       message: "Үндсэн админы эрх шаардлагатай."
     });
   }
-
   next();
 }
 
@@ -226,7 +238,6 @@ app.post("/api/register", async (req, res) => {
     }
 
     console.error(error);
-
     res.status(500).json({
       message: "Бүртгэл хийхэд алдаа гарлаа."
     });
@@ -268,7 +279,6 @@ app.post("/api/login", async (req, res) => {
     req.session.regenerate((error) => {
       if (error) {
         console.error(error);
-
         return res.status(500).json({
           message: "Нэвтрэхэд алдаа гарлаа."
         });
@@ -283,7 +293,6 @@ app.post("/api/login", async (req, res) => {
       req.session.save((saveError) => {
         if (saveError) {
           console.error(saveError);
-
           return res.status(500).json({
             message: "Нэвтрэхэд алдаа гарлаа."
           });
@@ -297,14 +306,13 @@ app.post("/api/login", async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Нэвтрэхэд алдаа гарлаа."
     });
   }
 });
 
-// СИСТЕМЭЭС ГАРАХ
+// ГАРАХ
 app.post("/api/logout", (req, res) => {
   req.session.destroy((error) => {
     if (error) {
@@ -333,18 +341,16 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
        FROM users
        ORDER BY created_at DESC`
     );
-
     res.json(result.rows);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Хэрэглэгчдийн мэдээлэл авахад алдаа гарлаа."
     });
   }
 });
 
-// АЖИЛТНЫ БҮРТГЭЛ ЗӨВШӨӨРӨХ / ТАТГАЛЗАХ
+// БҮРТГЭЛ ЗӨВШӨӨРӨХ / ТАТГАЛЗАХ
 app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
@@ -374,7 +380,6 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Төлөв шинэчлэхэд алдаа гарлаа."
     });
@@ -382,70 +387,60 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
 });
 
 // АДМИН ТОМИЛОХ
-app.patch(
-  "/api/superadmin/promote/:id",
-  requireSuperAdmin,
-  async (req, res) => {
-    try {
-      const result = await pool.query(
-        `UPDATE users
-         SET role = 'admin'
-         WHERE id = $1
-           AND status = 'approved'
-           AND role = 'employee'
-         RETURNING id`,
-        [req.params.id]
-      );
+app.patch("/api/superadmin/promote/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET role = 'admin'
+       WHERE id = $1
+         AND status = 'approved'
+         AND role = 'employee'
+       RETURNING id`,
+      [req.params.id]
+    );
 
-      if (!result.rowCount) {
-        return res.status(400).json({
-          message: "Зөвшөөрөгдсөн ажилтны бүртгэл олдсонгүй."
-        });
-      }
-
-      res.json({ message: "Админаар томиллоо." });
-    } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
-        message: "Админ томилоход алдаа гарлаа."
+    if (!result.rowCount) {
+      return res.status(400).json({
+        message: "Зөвшөөрөгдсөн ажилтны бүртгэл олдсонгүй."
       });
     }
+
+    res.json({ message: "Админаар томиллоо." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Админ томилоход алдаа гарлаа."
+    });
   }
-);
+});
 
 // АДМИНЫ ЭРХ ЦУЦЛАХ
-app.patch(
-  "/api/superadmin/demote/:id",
-  requireSuperAdmin,
-  async (req, res) => {
-    try {
-      const result = await pool.query(
-        `UPDATE users
-         SET role = 'employee'
-         WHERE id = $1 AND role = 'admin'
-         RETURNING id`,
-        [req.params.id]
-      );
+app.patch("/api/superadmin/demote/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET role = 'employee'
+       WHERE id = $1 AND role = 'admin'
+       RETURNING id`,
+      [req.params.id]
+    );
 
-      if (!result.rowCount) {
-        return res.status(400).json({
-          message: "Админ олдсонгүй."
-        });
-      }
-
-      res.json({
-        message: "Админы эрхийг цуцаллаа."
-      });
-    } catch (error) {
-      console.error(error);
-
-      res.status(500).json({
-        message: "Админы эрх цуцлахад алдаа гарлаа."
+    if (!result.rowCount) {
+      return res.status(400).json({
+        message: "Админ олдсонгүй."
       });
     }
+
+    res.json({
+      message: "Админы эрхийг цуцаллаа."
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Админы эрх цуцлахад алдаа гарлаа."
+    });
   }
-);
+});
 
 // НИЙТЛЭЛ НИЙТЛЭХ
 app.post(
@@ -552,7 +547,7 @@ app.post(
   }
 );
 
-// НИЙТЛЭЛ УСТГАХ — ЗӨВХӨН АДМИН
+// НИЙТЛЭЛ УСТГАХ
 app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
   try {
     const postId = Number(req.params.id);
@@ -575,12 +570,8 @@ app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
     }
 
     const attachments = result.rows[0].attachments || [];
+    const filePaths = attachments.map(file => file.path).filter(Boolean);
 
-    const filePaths = attachments
-      .map(file => file.path)
-      .filter(Boolean);
-
-    // Supabase Storage-оос хавсаргасан файлуудыг устгах
     if (filePaths.length > 0) {
       const { error } = await supabase.storage
         .from(BUCKET)
@@ -589,7 +580,6 @@ app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
       if (error) throw error;
     }
 
-    // Database-ээс нийтлэлийг устгах
     await pool.query(
       "DELETE FROM posts WHERE id = $1",
       [postId]
@@ -600,24 +590,140 @@ app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error("Post delete error:", error);
-
     res.status(500).json({
       message: "Нийтлэл устгахад алдаа гарлаа."
     });
   }
 });
 
+// АЖИЛТАН МЭДЭЭЛЭЛТЭЙ ТАНИЛЦСАНАА БАТАЛГААЖУУЛАХ
+app.post(
+  "/api/posts/:id/acknowledge",
+  requireLogin,
+  async (req, res) => {
+    try {
+      const postId = Number(req.params.id);
+
+      if (!Number.isInteger(postId) || postId <= 0) {
+        return res.status(400).json({
+          message: "Нийтлэлийн дугаар буруу байна."
+        });
+      }
+
+      if (["admin", "superadmin"].includes(req.session.user.role)) {
+        return res.status(403).json({
+          message: "Админ ажилтны өмнөөс танилцсан бүртгэл хийх боломжгүй."
+        });
+      }
+
+      const post = await pool.query(
+        "SELECT id FROM posts WHERE id = $1",
+        [postId]
+      );
+
+      if (!post.rowCount) {
+        return res.status(404).json({
+          message: "Мэдээлэл олдсонгүй."
+        });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO post_acknowledgements (post_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (post_id, user_id) DO NOTHING
+         RETURNING id, acknowledged_at`,
+        [postId, req.session.user.id]
+      );
+
+      if (!result.rowCount) {
+        return res.status(409).json({
+          message: "Та энэ мэдээлэлтэй өмнө нь танилцсан байна."
+        });
+      }
+
+      res.json({
+        message: "Танилцсан бүртгэл амжилттай хадгалагдлаа.",
+        acknowledgedAt: result.rows[0].acknowledged_at
+      });
+    } catch (error) {
+      console.error("Acknowledgement error:", error);
+      res.status(500).json({
+        message: "Танилцсан бүртгэл хийхэд алдаа гарлаа."
+      });
+    }
+  }
+);
+
+// АДМИН ТАНИЛЦСАН / ТАНИЛЦААГҮЙ АЖИЛТНУУДЫГ ХАРАХ
+app.get(
+  "/api/posts/:id/acknowledgements",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const postId = Number(req.params.id);
+
+      if (!Number.isInteger(postId) || postId <= 0) {
+        return res.status(400).json({
+          message: "Нийтлэлийн дугаар буруу байна."
+        });
+      }
+
+      const post = await pool.query(
+        "SELECT id FROM posts WHERE id = $1",
+        [postId]
+      );
+
+      if (!post.rowCount) {
+        return res.status(404).json({
+          message: "Мэдээлэл олдсонгүй."
+        });
+      }
+
+      const result = await pool.query(
+        `SELECT
+           u.id,
+           u.fullname,
+           u.phone,
+           a.acknowledged_at,
+           (a.id IS NOT NULL) AS acknowledged
+         FROM users u
+         LEFT JOIN post_acknowledgements a
+           ON a.user_id = u.id
+           AND a.post_id = $1
+         WHERE u.role = 'employee'
+           AND u.status = 'approved'
+         ORDER BY u.fullname ASC`,
+        [postId]
+      );
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Acknowledgement report error:", error);
+      res.status(500).json({
+        message: "Танилцсан тайлан авахад алдаа гарлаа."
+      });
+    }
+  }
+);
+
 // НИЙТЛЭЛҮҮДИЙГ ХАРАХ
 app.get("/api/posts", requireLogin, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM posts ORDER BY created_at DESC"
+      `SELECT
+         p.*,
+         a.acknowledged_at AS my_acknowledged_at
+       FROM posts p
+       LEFT JOIN post_acknowledgements a
+         ON a.post_id = p.id
+         AND a.user_id = $1
+       ORDER BY p.created_at DESC`,
+      [req.session.user.id]
     );
 
     res.json(result.rows);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       message: "Мэдээлэл авахад алдаа гарлаа."
     });
@@ -665,7 +771,6 @@ app.get(
       res.redirect(data.signedUrl);
     } catch (error) {
       console.error(error);
-
       res.status(500).json({
         message: "Файл нээхэд алдаа гарлаа."
       });
