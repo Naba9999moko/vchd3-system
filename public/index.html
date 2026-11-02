@@ -21,6 +21,7 @@ input,textarea,select{width:100%;padding:12px;margin:8px 0 15px;border:1px solid
 textarea{min-height:110px;resize:vertical}
 .main-btn{background:#0877bd;color:white;border:0;padding:12px 20px;border-radius:7px;cursor:pointer;font-weight:bold;margin:4px}
 .main-btn:hover{background:#07518d}
+.main-btn:disabled{opacity:.6;cursor:not-allowed}
 .danger{background:#c0392b}
 .success{background:#218c54}
 .hidden{display:none!important}
@@ -35,11 +36,18 @@ textarea{min-height:110px;resize:vertical}
 .file-list a{display:block;color:#07518d;margin:8px 0;text-decoration:none;overflow-wrap:anywhere}
 .file-list a:hover{text-decoration:underline}
 .file-note{font-size:13px;color:#718096;margin-top:-8px;margin-bottom:15px}
+.post-actions{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
+.ack-done{background:#e5f6ed;color:#176b3d;padding:12px;border-radius:7px;margin-top:12px;font-weight:bold}
+.ack-report{background:white;border:1px solid #d8e4ef;border-radius:8px;padding:14px;margin-top:12px}
+.ack-report h4{color:#07518d;margin:12px 0 8px}
+.ack-item{padding:8px;border-bottom:1px solid #e7edf3;font-size:14px}
+.ack-summary{background:#eaf3fc;padding:10px;border-radius:7px;margin-bottom:10px;font-weight:bold}
 footer{text-align:center;color:#718096;padding:25px}
 @media(max-width:600px){
 header h1{font-size:20px}
 nav button{flex:1 1 40%}
 .card{padding:16px}
+.main-btn{padding:11px 13px}
 }
 </style>
 </head>
@@ -142,6 +150,7 @@ nav button{flex:1 1 40%}
 
 <script>
 let currentUser = null;
+let currentCategory = "";
 
 async function api(url, method = "GET", data = null) {
   const options = {
@@ -240,13 +249,20 @@ async function logout() {
   }
 
   currentUser = null;
+  currentCategory = "";
   updateNavigation();
   hideAll();
   document.getElementById("authPanel").classList.remove("hidden");
   document.getElementById("loginPassword").value = "";
 }
 
+function formatDate(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("mn-MN");
+}
+
 async function showCategory(category) {
+  currentCategory = category;
   hideAll();
   document.getElementById("categoryPanel").classList.remove("hidden");
   document.getElementById("categoryTitle").textContent = category;
@@ -276,7 +292,7 @@ async function showCategory(category) {
       content.textContent = post.content;
 
       const date = document.createElement("small");
-      date.textContent = new Date(post.created_at).toLocaleString("mn-MN");
+      date.textContent = formatDate(post.created_at);
 
       article.append(heading, content, date);
 
@@ -300,11 +316,52 @@ async function showCategory(category) {
           link.textContent =
             (file.type === "application/pdf" ? "📄 " : "🖼️ ") +
             file.name + " — Нээх / татах";
-
           fileBox.appendChild(link);
         });
 
         article.appendChild(fileBox);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "post-actions";
+
+      const isAdmin = ["admin", "superadmin"].includes(currentUser.role);
+
+      if (isAdmin) {
+        const reportButton = document.createElement("button");
+        reportButton.className = "main-btn";
+        reportButton.textContent = "Танилцсан тайлан";
+        reportButton.onclick = () => loadAcknowledgements(post.id, reportBox);
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "main-btn danger";
+        deleteButton.textContent = "🗑 Устгах";
+        deleteButton.onclick = () => deletePost(post.id);
+
+        actions.append(reportButton, deleteButton);
+
+        const reportBox = document.createElement("div");
+        reportBox.className = "ack-report hidden";
+        reportBox.id = "report-" + post.id;
+
+        article.appendChild(actions);
+        article.appendChild(reportBox);
+      } else {
+        if (post.my_acknowledged_at) {
+          const done = document.createElement("div");
+          done.className = "ack-done";
+          done.textContent =
+            "✓ Та энэ мэдээлэлтэй танилцсан. Огноо: " +
+            formatDate(post.my_acknowledged_at);
+          article.appendChild(done);
+        } else {
+          const ackButton = document.createElement("button");
+          ackButton.className = "main-btn success";
+          ackButton.textContent = "✓ Танилцсан";
+          ackButton.onclick = () => acknowledgePost(post.id, ackButton);
+          actions.appendChild(ackButton);
+          article.appendChild(actions);
+        }
       }
 
       list.appendChild(article);
@@ -314,6 +371,121 @@ async function showCategory(category) {
   }
 }
 
+// ТАНИЛЦСАН БҮРТГЭЛ
+async function acknowledgePost(postId, button) {
+  if (!confirm("Та энэ мэдээлэлтэй танилцсан гэдгээ баталгаажуулах уу?")) {
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Бүртгэж байна...";
+
+  try {
+    const result = await api(
+      "/api/posts/" + postId + "/acknowledge",
+      "POST",
+      {}
+    );
+
+    alert(result.message);
+    await showCategory(currentCategory);
+  } catch (error) {
+    alert(error.message);
+    button.disabled = false;
+    button.textContent = "✓ Танилцсан";
+  }
+}
+
+// ТАНИЛЦСАН ТАЙЛАН
+async function loadAcknowledgements(postId, container) {
+  if (!container.classList.contains("hidden")) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+  container.textContent = "Тайлан ачаалж байна...";
+
+  try {
+    const users = await api(
+      "/api/posts/" + postId + "/acknowledgements"
+    );
+
+    container.replaceChildren();
+
+    const acknowledged = users.filter(user => user.acknowledged);
+    const notAcknowledged = users.filter(user => !user.acknowledged);
+
+    const summary = document.createElement("div");
+    summary.className = "ack-summary";
+    summary.textContent =
+      "Нийт ажилтан: " + users.length +
+      " | Танилцсан: " + acknowledged.length +
+      " | Танилцаагүй: " + notAcknowledged.length;
+
+    container.appendChild(summary);
+
+    const doneTitle = document.createElement("h4");
+    doneTitle.textContent = "✓ Танилцсан ажилтнууд";
+    container.appendChild(doneTitle);
+
+    if (acknowledged.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "Одоогоор танилцсан ажилтан алга.";
+      container.appendChild(empty);
+    }
+
+    acknowledged.forEach(user => {
+      const item = document.createElement("div");
+      item.className = "ack-item";
+      item.textContent =
+        user.fullname + " | " + user.phone +
+        " | " + formatDate(user.acknowledged_at);
+      container.appendChild(item);
+    });
+
+    const pendingTitle = document.createElement("h4");
+    pendingTitle.textContent = "○ Танилцаагүй ажилтнууд";
+    container.appendChild(pendingTitle);
+
+    if (notAcknowledged.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "Бүх ажилтан танилцсан байна.";
+      container.appendChild(empty);
+    }
+
+    notAcknowledged.forEach(user => {
+      const item = document.createElement("div");
+      item.className = "ack-item";
+      item.textContent = user.fullname + " | " + user.phone;
+      container.appendChild(item);
+    });
+
+  } catch (error) {
+    container.textContent = error.message;
+  }
+}
+
+// НИЙТЛЭЛ УСТГАХ
+async function deletePost(postId) {
+  if (!confirm("Энэ нийтлэл болон хавсаргасан файлуудыг устгах уу?")) {
+    return;
+  }
+
+  try {
+    const result = await api(
+      "/api/posts/" + postId,
+      "DELETE"
+    );
+
+    alert(result.message);
+    await showCategory(currentCategory);
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+// ХЭРЭГЛЭГЧДИЙН ЖАГСААЛТ
 async function loadUsers() {
   const list = document.getElementById("userList");
   list.textContent = "Бүртгэлүүдийг ачаалж байна...";
@@ -422,6 +594,7 @@ async function demoteUser(id) {
   }
 }
 
+// ШИНЭ МЭДЭЭЛЭЛ НИЙТЛЭХ
 async function createPost() {
   const message = document.getElementById("postMessage");
   const button = document.getElementById("publishButton");
@@ -468,6 +641,7 @@ async function createPost() {
   }
 }
 
+// ӨМНӨ НЭВТЭРСЭН ЭСЭХИЙГ ШАЛГАХ
 async function checkSession() {
   try {
     const result = await api("/api/me");
