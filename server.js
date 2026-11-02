@@ -1,4 +1,3 @@
-
 const express = require("express");
 const path = require("path");
 const { Pool } = require("pg");
@@ -56,6 +55,7 @@ const upload = multer({
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
+      cb(null, false);
       cb(new Error("Зөвхөн PDF болон зураг оруулна уу."));
     }
   }
@@ -161,6 +161,7 @@ function requireLogin(req, res, next) {
       message: "Нэвтэрнэ үү."
     });
   }
+
   next();
 }
 
@@ -173,6 +174,7 @@ function requireAdmin(req, res, next) {
       message: "Админы эрх шаардлагатай."
     });
   }
+
   next();
 }
 
@@ -185,9 +187,11 @@ function requireSuperAdmin(req, res, next) {
       message: "Үндсэн админы эрх шаардлагатай."
     });
   }
+
   next();
 }
 
+// БҮРТГЭЛ
 app.post("/api/register", async (req, res) => {
   try {
     const { fullname, phone, password } = req.body;
@@ -222,12 +226,14 @@ app.post("/api/register", async (req, res) => {
     }
 
     console.error(error);
+
     res.status(500).json({
       message: "Бүртгэл хийхэд алдаа гарлаа."
     });
   }
 });
 
+// НЭВТРЭХ
 app.post("/api/login", async (req, res) => {
   try {
     const phone = req.body.phone?.trim();
@@ -262,6 +268,7 @@ app.post("/api/login", async (req, res) => {
     req.session.regenerate((error) => {
       if (error) {
         console.error(error);
+
         return res.status(500).json({
           message: "Нэвтрэхэд алдаа гарлаа."
         });
@@ -276,6 +283,7 @@ app.post("/api/login", async (req, res) => {
       req.session.save((saveError) => {
         if (saveError) {
           console.error(saveError);
+
           return res.status(500).json({
             message: "Нэвтрэхэд алдаа гарлаа."
           });
@@ -289,12 +297,14 @@ app.post("/api/login", async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Нэвтрэхэд алдаа гарлаа."
     });
   }
 });
 
+// СИСТЕМЭЭС ГАРАХ
 app.post("/api/logout", (req, res) => {
   req.session.destroy((error) => {
     if (error) {
@@ -308,12 +318,14 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
+// ОДОО НЭВТЭРСЭН ХЭРЭГЛЭГЧ
 app.get("/api/me", (req, res) => {
   res.json({
     user: req.session.user || null
   });
 });
 
+// ХЭРЭГЛЭГЧДИЙН ЖАГСААЛТ
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -325,12 +337,14 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Хэрэглэгчдийн мэдээлэл авахад алдаа гарлаа."
     });
   }
 });
 
+// АЖИЛТНЫ БҮРТГЭЛ ЗӨВШӨӨРӨХ / ТАТГАЛЗАХ
 app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
@@ -360,12 +374,14 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Төлөв шинэчлэхэд алдаа гарлаа."
     });
   }
 });
 
+// АДМИН ТОМИЛОХ
 app.patch(
   "/api/superadmin/promote/:id",
   requireSuperAdmin,
@@ -390,6 +406,7 @@ app.patch(
       res.json({ message: "Админаар томиллоо." });
     } catch (error) {
       console.error(error);
+
       res.status(500).json({
         message: "Админ томилоход алдаа гарлаа."
       });
@@ -397,6 +414,7 @@ app.patch(
   }
 );
 
+// АДМИНЫ ЭРХ ЦУЦЛАХ
 app.patch(
   "/api/superadmin/demote/:id",
   requireSuperAdmin,
@@ -421,6 +439,7 @@ app.patch(
       });
     } catch (error) {
       console.error(error);
+
       res.status(500).json({
         message: "Админы эрх цуцлахад алдаа гарлаа."
       });
@@ -428,6 +447,7 @@ app.patch(
   }
 );
 
+// НИЙТЛЭЛ НИЙТЛЭХ
 app.post(
   "/api/posts",
   requireAdmin,
@@ -477,7 +497,6 @@ app.post(
           .replace(/[^a-zA-Z0-9._-]/g, "_")
           .slice(-100);
 
-        // Файлыг bucket-ийн үндсэн хавтсанд хадгална.
         const filePath = `${randomUUID()}-${safeName}`;
 
         const { error } = await supabase.storage
@@ -533,6 +552,62 @@ app.post(
   }
 );
 
+// НИЙТЛЭЛ УСТГАХ — ЗӨВХӨН АДМИН
+app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
+  try {
+    const postId = Number(req.params.id);
+
+    if (!Number.isInteger(postId) || postId <= 0) {
+      return res.status(400).json({
+        message: "Нийтлэлийн дугаар буруу байна."
+      });
+    }
+
+    const result = await pool.query(
+      "SELECT attachments FROM posts WHERE id = $1",
+      [postId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({
+        message: "Нийтлэл олдсонгүй."
+      });
+    }
+
+    const attachments = result.rows[0].attachments || [];
+
+    const filePaths = attachments
+      .map(file => file.path)
+      .filter(Boolean);
+
+    // Supabase Storage-оос хавсаргасан файлуудыг устгах
+    if (filePaths.length > 0) {
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .remove(filePaths);
+
+      if (error) throw error;
+    }
+
+    // Database-ээс нийтлэлийг устгах
+    await pool.query(
+      "DELETE FROM posts WHERE id = $1",
+      [postId]
+    );
+
+    res.json({
+      message: "Нийтлэл амжилттай устгагдлаа."
+    });
+  } catch (error) {
+    console.error("Post delete error:", error);
+
+    res.status(500).json({
+      message: "Нийтлэл устгахад алдаа гарлаа."
+    });
+  }
+});
+
+// НИЙТЛЭЛҮҮДИЙГ ХАРАХ
 app.get("/api/posts", requireLogin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -542,12 +617,14 @@ app.get("/api/posts", requireLogin, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Мэдээлэл авахад алдаа гарлаа."
     });
   }
 });
 
+// ХАВСАРГАСАН ФАЙЛ НЭЭХ
 app.get(
   "/api/posts/:id/attachments/:index",
   requireLogin,
@@ -588,6 +665,7 @@ app.get(
       res.redirect(data.signedUrl);
     } catch (error) {
       console.error(error);
+
       res.status(500).json({
         message: "Файл нээхэд алдаа гарлаа."
       });
@@ -595,12 +673,14 @@ app.get(
   }
 );
 
+// ҮНДСЭН ХУУДАС
 app.get("/", (req, res) => {
   res.sendFile(
     path.join(__dirname, "public", "index.html")
   );
 });
 
+// АЛДАА БОЛОВСРУУЛАХ
 app.use((error, req, res, next) => {
   console.error(error);
 
@@ -615,6 +695,7 @@ app.use((error, req, res, next) => {
   });
 });
 
+// SERVER АСААХ
 async function start() {
   await setupDatabase();
 
