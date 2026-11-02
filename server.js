@@ -15,7 +15,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
-const BUCKET = "vchd3_storage";
+const BUCKET = "vchd3-files";
 
 if (
   !process.env.DATABASE_URL ||
