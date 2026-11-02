@@ -1,4 +1,6 @@
+
 const express = require("express");
+const path = require("path");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
@@ -81,10 +83,15 @@ async function setupDatabase() {
 
     if (existing.rowCount === 0) {
       const hash = await bcrypt.hash(adminPassword, 12);
+
       await pool.query(
         `INSERT INTO users (fullname, phone, password, role, status)
          VALUES ($1, $2, $3, 'superadmin', 'approved')`,
-        [process.env.ADMIN_NAME || "Үндсэн админ", adminPhone, hash]
+        [
+          process.env.ADMIN_NAME || "Үндсэн админ",
+          adminPhone,
+          hash
+        ]
       );
     }
   }
@@ -98,16 +105,25 @@ function requireLogin(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session.user ||
-      !["admin", "superadmin"].includes(req.session.user.role)) {
-    return res.status(403).json({ message: "Админы эрх шаардлагатай." });
+  if (
+    !req.session.user ||
+    !["admin", "superadmin"].includes(req.session.user.role)
+  ) {
+    return res.status(403).json({
+      message: "Админы эрх шаардлагатай."
+    });
   }
   next();
 }
 
 function requireSuperAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== "superadmin") {
-    return res.status(403).json({ message: "Үндсэн админы эрх шаардлагатай." });
+  if (
+    !req.session.user ||
+    req.session.user.role !== "superadmin"
+  ) {
+    return res.status(403).json({
+      message: "Үндсэн админы эрх шаардлагатай."
+    });
   }
   next();
 }
@@ -136,10 +152,15 @@ app.post("/api/register", async (req, res) => {
     });
   } catch (error) {
     if (error.code === "23505") {
-      return res.status(409).json({ message: "Энэ утасны дугаар бүртгэлтэй байна." });
+      return res.status(409).json({
+        message: "Энэ утасны дугаар бүртгэлтэй байна."
+      });
     }
+
     console.error(error);
-    res.status(500).json({ message: "Бүртгэл хийхэд алдаа гарлаа." });
+    res.status(500).json({
+      message: "Бүртгэл хийхэд алдаа гарлаа."
+    });
   }
 });
 
@@ -154,14 +175,18 @@ app.post("/api/login", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      return res.status(401).json({ message: "Нэвтрэх мэдээлэл буруу байна." });
+      return res.status(401).json({
+        message: "Нэвтрэх мэдээлэл буруу байна."
+      });
     }
 
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password);
 
     if (!valid) {
-      return res.status(401).json({ message: "Нэвтрэх мэдээлэл буруу байна." });
+      return res.status(401).json({
+        message: "Нэвтрэх мэдээлэл буруу байна."
+      });
     }
 
     if (user.status !== "approved") {
@@ -176,10 +201,15 @@ app.post("/api/login", async (req, res) => {
       role: user.role
     };
 
-    res.json({ message: "Амжилттай нэвтэрлээ.", user: req.session.user });
+    res.json({
+      message: "Амжилттай нэвтэрлээ.",
+      user: req.session.user
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Нэвтрэхэд алдаа гарлаа." });
+    res.status(500).json({
+      message: "Нэвтрэхэд алдаа гарлаа."
+    });
   }
 });
 
@@ -195,12 +225,14 @@ app.get("/api/me", (req, res) => {
   res.json({ user: req.session.user || null });
 });
 
-// Админ хүлээгдэж буй бүртгэлүүдийг харах
+// Админ хэрэглэгчдийн жагсаалт харах
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   const result = await pool.query(
     `SELECT id, fullname, phone, role, status, created_at
-     FROM users ORDER BY created_at DESC`
+     FROM users
+     ORDER BY created_at DESC`
   );
+
   res.json(result.rows);
 });
 
@@ -209,7 +241,9 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
   const { status } = req.body;
 
   if (!["approved", "rejected"].includes(status)) {
-    return res.status(400).json({ message: "Төлөв буруу байна." });
+    return res.status(400).json({
+      message: "Төлөв буруу байна."
+    });
   }
 
   await pool.query(
@@ -217,13 +251,16 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     [status, req.params.id]
   );
 
-  res.json({ message: "Бүртгэлийн төлөв шинэчлэгдлээ." });
+  res.json({
+    message: "Бүртгэлийн төлөв шинэчлэгдлээ."
+  });
 });
 
 // Үндсэн админ админ томилох
 app.patch("/api/superadmin/promote/:id", requireSuperAdmin, async (req, res) => {
   const result = await pool.query(
-    `UPDATE users SET role = 'admin'
+    `UPDATE users
+     SET role = 'admin'
      WHERE id = $1 AND status = 'approved' AND role = 'employee'
      RETURNING id`,
     [req.params.id]
@@ -241,14 +278,17 @@ app.patch("/api/superadmin/promote/:id", requireSuperAdmin, async (req, res) => 
 // Үндсэн админ админы эрх цуцлах
 app.patch("/api/superadmin/demote/:id", requireSuperAdmin, async (req, res) => {
   const result = await pool.query(
-    `UPDATE users SET role = 'employee'
+    `UPDATE users
+     SET role = 'employee'
      WHERE id = $1 AND role = 'admin'
      RETURNING id`,
     [req.params.id]
   );
 
   if (!result.rowCount) {
-    return res.status(400).json({ message: "Админ олдсонгүй." });
+    return res.status(400).json({
+      message: "Админ олдсонгүй."
+    });
   }
 
   res.json({ message: "Админы эрхийг цуцаллаа." });
@@ -266,12 +306,15 @@ app.post("/api/posts", requireAdmin, async (req, res) => {
   ];
 
   if (!allowed.includes(category) || !title || !content) {
-    return res.status(400).json({ message: "Мэдээллээ бүрэн оруулна уу." });
+    return res.status(400).json({
+      message: "Мэдээллээ бүрэн оруулна уу."
+    });
   }
 
   const result = await pool.query(
     `INSERT INTO posts (category, title, content, author_id)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
     [category, title, content, req.session.user.id]
   );
 
@@ -283,15 +326,19 @@ app.get("/api/posts", requireLogin, async (req, res) => {
   const result = await pool.query(
     "SELECT * FROM posts ORDER BY created_at DESC"
   );
+
   res.json(result.rows);
 });
 
+// НҮҮР ХУУДАС НЭЭХ
 app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Сервер эхлүүлэх
 async function start() {
   await setupDatabase();
+
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
