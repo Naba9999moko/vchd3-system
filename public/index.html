@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ВЧД-3 цахим мэдээллийн систем</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #eef3f9;
+      color: #1c2e45;
+    }
+
+    header {
+      background: linear-gradient(135deg, #073b75, #0877bd);
+      color: white;
+      padding: 25px 15px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 25px;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      opacity: 0.9;
+    }
+
+    nav {
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 15px;
+      box-shadow: 0 2px 8px #00000012;
+    }
+
+    nav button {
+      border: none;
+      background: #e6f0fa;
+      color: #07518d;
+      padding: 12px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    nav button:hover,
+    nav button.active {
+      background: #0877bd;
+      color: white;
+    }
+
+    .container {
+      max-width: 950px;
+      margin: 25px auto;
+      padding: 15px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 3px 12px #173b5b12;
+    }
+
+    h2 {
+      color: #07518d;
+      margin-bottom: 18px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0 15px;
+      border: 1px solid #ccd8e5;
+      border-radius: 7px;
+      font-size: 15px;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .main-btn {
+      background: #0877bd;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 4px;
+    }
+
+    .main-btn:hover {
+      background: #07518d;
+    }
+
+    .danger {
+      background: #c0392b;
+    }
+
+    .success {
+      background: #218c54;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .message {
+      margin: 12px 0;
+      color: #07518d;
+      font-weight: bold;
+    }
+
+    .post {
+      border-left: 4px solid #0877bd;
+      background: #f5f9fd;
+      padding: 15px;
+      margin: 12px 0;
+      border-radius: 6px;
+    }
+
+    .post h3 {
+      margin-bottom: 8px;
+      color: #07518d;
+    }
+
+    .post small {
+      color: #718096;
+    }
+
+    .user-row {
+      padding: 12px;
+      border-bottom: 1px solid #e3eaf1;
+    }
+
+    footer {
+      text-align: center;
+      color: #718096;
+      padding: 25px;
+    }
+
+    @media(max-width: 600px) {
+      header h1 {
+        font-size: 20px;
+      }
+
+      nav button {
+        flex: 1 1 40%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>ВЧД-3 ЦАХИМ МЭДЭЭЛЛИЙН СИСТЕМ</h1>
+  <p>Вагон ашиглалтын депогийн мэдээллийн нэгдсэн систем</p>
+</header>
+
+<nav id="navigation" class="hidden">
+  <button onclick="showCategory('ГТХАБ')">ГТХАБ</button>
+  <button onclick="showCategory('Техникийн мэдээлэл')">Техникийн мэдээлэл</button>
+  <button onclick="showCategory('Цахилгаан тушаал')">Цахилгаан тушаал</button>
+  <button onclick="showCategory('ХАБЭА')">ХАБЭА</button>
+  <button onclick="showPanel('home')">Нүүр</button>
+  <button onclick="logout()">Гарах</button>
+</nav>
+
+<div class="container">
+
+  <section id="authPanel">
+    <div class="card">
+      <h2>Системд нэвтрэх</h2>
+
+      <label>Утасны дугаар</label>
+      <input id="loginPhone" type="tel" placeholder="Утасны дугаар">
+
+      <label>Нууц үг</label>
+      <input id="loginPassword" type="password" placeholder="Нууц үг">
+
+      <button class="main-btn" onclick="login()">Нэвтрэх</button>
+
+      <p class="message" id="loginMessage"></p>
+    </div>
+
+    <div class="card">
+      <h2>Ажилтны бүртгэл</h2>
+
+      <label>Овог нэр</label>
+      <input id="regName" placeholder="Овог нэр">
+
+      <label>Утасны дугаар</label>
+      <input id="regPhone" type="tel" placeholder="Утасны дугаар">
+
+      <label>Нууц үг</label>
+      <input id="regPassword" type="password" placeholder="8-аас дээш тэмдэгт">
+
+      <button class="main-btn" onclick="register()">Бүртгүүлэх</button>
+
+      <p class="message" id="registerMessage"></p>
+    </div>
+  </section>
+
+  <section id="homePanel" class="hidden">
+    <div class="card">
+      <h2>Тавтай морил!</h2>
+      <p id="welcomeText"></p>
+      <p>Доорх цэснээс өөрт хэрэгтэй мэдээллээ сонгоно уу.</p>
+    </div>
+  </section>
+
+  <section id="categoryPanel" class="hidden">
+    <div class="card">
+      <h2 id="categoryTitle"></h2>
+      <div id="postsList"></div>
+    </div>
+  </section>
+
+  <section id="adminPanel" class="hidden">
+    <div class="card">
+      <h2>Админы удирдлага</h2>
+
+      <div id="userList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Шинэ мэдээлэл оруулах</h2>
+
+      <label>Мэдээллийн төрөл</label>
+      <select id="postCategory">
+        <option>ГТХАБ</option>
+        <option>Техникийн мэдээлэл</option>
+        <option>Цахилгаан тушаал</option>
+        <option>ХАБЭА</option>
+      </select>
+
+      <label>Гарчиг</label>
+      <input id="postTitle" placeholder="Мэдээллийн гарчиг">
+
+      <label>Мэдээлэл</label>
+      <textarea id="postContent" placeholder="Мэдээллээ бичнэ үү"></textarea>
+
+      <button class="main-btn" onclick="createPost()">Нийтлэх</button>
+      <p class="message" id="postMessage"></p>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  © 2026 ВЧД-3 | Цахим мэдээллийн систем
+</footer>
+
+<script>
+  let currentUser = null;
+
+  async function api(url, method = "GET", data = null) {
+    const options = {
+      method,
+      credentials: "same-origin",
+      headers: {}
+    };
+
+    if (data) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(url, options);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Алдаа гарлаа.");
+    }
+
+    return result;
+  }
+
+  function hideAll() {
+    document.getElementById("authPanel").classList.add("hidden");
+    document.getElementById("homePanel").classList.add("hidden");
+    document.getElementById("categoryPanel").classList.add("hidden");
+    document.getElementById("adminPanel").classList.add("hidden");
+  }
+
+  function showPanel(name) {
+    hideAll();
+
+    if (name === "home") {
+      document.getElementById("homePanel").classList.remove("hidden");
+    }
+
+    if (name === "admin") {
+      document.getElementById("adminPanel").classList.remove("hidden");
+      loadUsers();
+    }
+  }
+
+  async function register() {
+    const message = document.getElementById("registerMessage");
+    message.textContent = "";
+
+    try {
+      const result = await api("/api/register", "POST", {
+        fullname: document.getElementById("regName").value,
+        phone: document.getElementById("regPhone").value,
+        password: document.getElementById("regPassword").value
+      });
+
+      message.textContent = result.message;
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+
+  async function login() {
+    const message = document.getElementById("loginMessage");
+    message.textContent = "";
+
+    try {
+      const result = await api("/api/login", "POST", {
+        phone: document.getElementById("loginPhone").value,
+        password: document.getElementById("loginPassword").value
+      });
+
+      currentUser = result.user;
+      document.getElementById("navigation").classList.remove("hidden");
+      document.getElementById("authPanel").classList.add("hidden");
+
+      document.getElementById("welcomeText").textContent =
+        currentUser.fullname + " — амжилттай нэвтэрлээ.";
+
+      showPanel("home");
+
+      if (["admin", "superadmin"].includes(currentUser.role)) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+        loadUsers();
+      }
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+
+  async function logout() {
+    try {
+      await api("/api/logout", "POST");
+    } finally {
+      currentUser = null;
+      document.getElementById("navigation").classList.add("hidden");
+      hideAll();
+      document.getElementById("authPanel").classList.remove("hidden");
+    }
+  }
+
+  async function showCategory(category) {
+    hideAll();
+
+    document.getElementById("categoryPanel").classList.remove("hidden");
+    document.getElementById("categoryTitle").textContent = category;
+
+    const list = document.getElementById("postsList");
+    list.textContent = "Мэдээлэл ачаалж байна...";
+
+    try {
+      const posts = await api("/api/posts");
+      const filtered = posts.filter(post => post.category === category);
+
+      list.replaceChildren();
+
+      if (filtered.length === 0) {
+        list.textContent = "Одоогоор мэдээлэл оруулаагүй байна.";
+        return;
+      }
+
+      filtered.forEach(post => {
+        const article = document.createElement("article");
+        article.className = "post";
+
+        const heading = document.createElement("h3");
+        heading.textContent = post.title;
+
+        const content = document.createElement("p");
+        content.textContent = post.content;
+
+        const date = document.createElement("small");
+        date.textContent = new Date(post.created_at).toLocaleString("mn-MN");
+
+        article.append(heading, content, date);
+        list.appendChild(article);
+      });
+    } catch (error) {
+      list.textContent = error.message;
+    }
+  }
+
+  async function loadUsers() {
+    const list = document.getElementById("userList");
+    list.textContent = "Бүртгэлүүдийг ачаалж байна...";
+
+    try {
+      const users = await api("/api/admin/users");
+      list.replaceChildren();
+
+      if (users.length === 0) {
+        list.textContent = "Бүртгэл алга.";
+        return;
+      }
+
+      users.forEach(user => {
+        const row = document.createElement("div");
+        row.className = "user-row";
+
+        const info = document.createElement("p");
+        info.textContent =
+          user.fullname + " | " + user.phone +
+          " | " + user.role + " | " + user.status;
+
+        row.appendChild(info);
+
+        if (user.role === "employee" && user.status === "pending") {
+          const approve = document.createElement("button");
+          approve.className = "main-btn success";
+          approve.textContent = "Зөвшөөрөх";
+          approve.onclick = () => updateUser(user.id, "approved");
+
+          const reject = document.createElement("button");
+          reject.className = "main-btn danger";
+          reject.textContent = "Татгалзах";
+          reject.onclick = () => updateUser(user.id, "rejected");
+
+          row.append(approve, reject);
+        }
+
+        if (currentUser.role === "superadmin" &&
+            user.role === "employee" &&
+            user.status === "approved") {
+          const promote = document.createElement("button");
+          promote.className = "main-btn";
+          promote.textContent = "Админ болгох";
+          promote.onclick = () => promoteUser(user.id);
+          row.appendChild(promote);
+        }
+
+        if (currentUser.role === "superadmin" && user.role === "admin") {
+          const demote = document.createElement("button");
+          demote.className = "main-btn danger";
+          demote.textContent = "Админы эрх цуцлах";
+          demote.onclick = () => demoteUser(user.id);
+          row.appendChild(demote);
+        }
+
+        list.appendChild(row);
+      });
+    } catch (error) {
+      list.textContent = error.message;
+    }
+  }
+
+  async function updateUser(id, status) {
+    try {
+      const result = await api("/api/admin/users/" + id, "PATCH", { status });
+      alert(result.message);
+      loadUsers();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function promoteUser(id) {
+    try {
+      const result = await api("/api/superadmin/promote/" + id, "PATCH", {});
+      alert(result.message);
+      loadUsers();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function demoteUser(id) {
+    try {
+      const result = await api("/api/superadmin/demote/" + id, "PATCH", {});
+      alert(result.message);
+      loadUsers();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function createPost() {
+    const message = document.getElementById("postMessage");
+
+    try {
+      const result = await api("/api/posts", "POST", {
+        category: document.getElementById("postCategory").value,
+        title: document.getElementById("postTitle").value,
+        content: document.getElementById("postContent").value
+      });
+
+      message.textContent = "Мэдээлэл амжилттай нийтлэгдлээ.";
+      document.getElementById("postTitle").value = "";
+      document.getElementById("postContent").value = "";
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+
+  async function checkSession() {
+    try {
+      const result = await api("/api/me");
+
+      if (result.user) {
+        currentUser = result.user;
+        document.getElementById("navigation").classList.remove("hidden");
+        document.getElementById("authPanel").classList.add("hidden");
+        document.getElementById("welcomeText").textContent =
+          currentUser.fullname + " — тавтай морил.";
+
+        showPanel("home");
+
+        if (["admin", "superadmin"].includes(currentUser.role)) {
+          document.getElementById("adminPanel").classList.remove("hidden");
+          loadUsers();
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  checkSession();
+</script>
+
+</body>
+</html>
