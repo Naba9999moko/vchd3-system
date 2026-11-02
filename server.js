@@ -15,7 +15,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
-const BUCKET = "vchd3-files";
+const BUCKET = "vchd3_storage";
 
 if (
   !process.env.DATABASE_URL ||
@@ -86,7 +86,6 @@ app.use(session({
   }
 }));
 
-// Өгөгдлийн сан болон Үндсэн админ
 async function setupDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -156,7 +155,6 @@ async function setupDatabase() {
   console.log("Үндсэн админы эрх тохируулагдлаа.");
 }
 
-// Нэвтрэх эрх шалгах
 function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.status(401).json({
@@ -190,7 +188,6 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
-// Ажилтны бүртгэл
 app.post("/api/register", async (req, res) => {
   try {
     const { fullname, phone, password } = req.body;
@@ -231,7 +228,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Нэвтрэх
 app.post("/api/login", async (req, res) => {
   try {
     const phone = req.body.phone?.trim();
@@ -299,7 +295,6 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Системээс гарах
 app.post("/api/logout", (req, res) => {
   req.session.destroy((error) => {
     if (error) {
@@ -313,14 +308,12 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
-// Одоогийн хэрэглэгч
 app.get("/api/me", (req, res) => {
   res.json({
     user: req.session.user || null
   });
 });
 
-// Хэрэглэгчдийн жагсаалт
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -338,7 +331,6 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
   }
 });
 
-// Бүртгэл зөвшөөрөх / татгалзах
 app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
@@ -374,7 +366,6 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// Үндсэн админ админ томилох
 app.patch(
   "/api/superadmin/promote/:id",
   requireSuperAdmin,
@@ -406,7 +397,6 @@ app.patch(
   }
 );
 
-// Үндсэн админ админы эрх цуцлах
 app.patch(
   "/api/superadmin/demote/:id",
   requireSuperAdmin,
@@ -438,7 +428,6 @@ app.patch(
   }
 );
 
-// Мэдээлэл оруулах: PDF болон зураг хавсаргах
 app.post(
   "/api/posts",
   requireAdmin,
@@ -543,7 +532,6 @@ app.post(
   }
 );
 
-// Мэдээлэл харах
 app.get("/api/posts", requireLogin, async (req, res) => {
   try {
     const result = await pool.query(
@@ -559,7 +547,6 @@ app.get("/api/posts", requireLogin, async (req, res) => {
   }
 });
 
-// Хавсаргасан файл нээх / татах
 app.get(
   "/api/posts/:id/attachments/:index",
   requireLogin,
@@ -607,14 +594,12 @@ app.get(
   }
 );
 
-// Нүүр хуудас
 app.get("/", (req, res) => {
   res.sendFile(
     path.join(__dirname, "public", "index.html")
   );
 });
 
-// Файл болон бусад алдааг боловсруулах
 app.use((error, req, res, next) => {
   console.error(error);
 
@@ -629,7 +614,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Сервер эхлүүлэх
 async function start() {
   await setupDatabase();
 
