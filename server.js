@@ -477,7 +477,8 @@ app.post(
           .replace(/[^a-zA-Z0-9._-]/g, "_")
           .slice(-100);
 
-        const filePath = `${postId}/${randomUUID()}-${safeName}`;
+        // Файлыг bucket-ийн үндсэн хавтсанд хадгална.
+        const filePath = `${randomUUID()}-${safeName}`;
 
         const { error } = await supabase.storage
           .from(BUCKET)
