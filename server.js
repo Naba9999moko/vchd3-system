@@ -100,6 +100,13 @@ async function setupDatabase() {
     )
   `);
 
+  // БАЙГУУЛЛАГА / ХЭСГИЙН НЭР НЭМЭХ
+  // Өмнө бүртгүүлсэн хэрэглэгчдийн мэдээллийг устгахгүй.
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS organization TEXT NOT NULL DEFAULT ''
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS posts (
       id SERIAL PRIMARY KEY,
@@ -147,12 +154,13 @@ async function setupDatabase() {
   if (existing.rowCount === 0) {
     await pool.query(
       `INSERT INTO users
-       (fullname, phone, password, role, status)
-       VALUES ($1, $2, $3, 'superadmin', 'approved')`,
+       (fullname, phone, password, role, status, organization)
+       VALUES ($1, $2, $3, 'superadmin', 'approved', $4)`,
       [
         process.env.ADMIN_NAME || "Үндсэн админ",
         adminPhone,
-        hash
+        hash,
+        "ВЧД-3"
       ]
     );
   } else {
@@ -206,25 +214,32 @@ function requireSuperAdmin(req, res, next) {
 // БҮРТГЭЛ
 app.post("/api/register", async (req, res) => {
   try {
-    const { fullname, phone, password } = req.body;
+    const { fullname, phone, password, organization } = req.body;
 
     if (
       !fullname?.trim() ||
       !phone?.trim() ||
+      !organization?.trim() ||
       !password ||
       password.length < 8
     ) {
       return res.status(400).json({
-        message: "Мэдээллээ бүрэн оруулна уу. Нууц үг 8-аас дээш тэмдэгт байна."
+        message: "Овог нэр, утас, байгууллагын нэрээ бүрэн оруулна уу. Нууц үг 8-аас дээш тэмдэгт байна."
       });
     }
 
     const hash = await bcrypt.hash(password, 12);
 
     await pool.query(
-      `INSERT INTO users (fullname, phone, password)
-       VALUES ($1, $2, $3)`,
-      [fullname.trim(), phone.trim(), hash]
+      `INSERT INTO users
+       (fullname, phone, password, organization)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        fullname.trim(),
+        phone.trim(),
+        hash,
+        organization.trim()
+      ]
     );
 
     res.json({
@@ -287,6 +302,8 @@ app.post("/api/login", async (req, res) => {
       req.session.user = {
         id: user.id,
         fullname: user.fullname,
+        phone: user.phone,
+        organization: user.organization || "",
         role: user.role
       };
 
@@ -337,10 +354,18 @@ app.get("/api/me", (req, res) => {
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, fullname, phone, role, status, created_at
+      `SELECT
+         id,
+         fullname,
+         phone,
+         organization,
+         role,
+         status,
+         created_at
        FROM users
        ORDER BY created_at DESC`
     );
+
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -684,6 +709,7 @@ app.get(
            u.id,
            u.fullname,
            u.phone,
+           u.organization,
            a.acknowledged_at,
            (a.id IS NOT NULL) AS acknowledged
          FROM users u
@@ -692,7 +718,7 @@ app.get(
            AND a.post_id = $1
          WHERE u.role = 'employee'
            AND u.status = 'approved'
-         ORDER BY u.fullname ASC`,
+         ORDER BY u.organization ASC, u.fullname ASC`,
         [postId]
       );
 
