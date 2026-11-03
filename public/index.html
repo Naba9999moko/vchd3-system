@@ -445,11 +445,14 @@ async function loadAcknowledgements(postId, container) {
     acknowledged.forEach(user => {
       const item = document.createElement("div");
       item.className = "ack-item";
+
       item.textContent =
         user.fullname +
         " | Байгууллага: " + (user.organization || "Тодорхойгүй") +
         " | Утас: " + user.phone +
-        " | " + formatDate(user.acknowledged_at);
+        " | " + formatDate(user.acknowledged_at) +
+        (user.status === "deleted" ? " | (хуучин бүртгэл)" : "");
+
       container.appendChild(item);
     });
 
@@ -560,10 +563,47 @@ async function loadUsers() {
         row.appendChild(demote);
       }
 
+      // АДМИН БОЛОН ҮНДСЭН АДМИН АЖИЛТНЫГ УСТГАХ
+      if (
+        user.role === "employee" &&
+        user.status !== "deleted"
+      ) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "main-btn danger";
+        deleteButton.textContent = "🗑 Устгах";
+        deleteButton.onclick = () => deleteUser(user.id, user.fullname);
+        row.appendChild(deleteButton);
+      }
+
       list.appendChild(row);
     });
+
   } catch (error) {
     list.textContent = error.message;
+  }
+}
+
+// АЖИЛТНЫН БҮРТГЭЛ ЗӨӨЛНӨӨР УСТГАХ
+async function deleteUser(id, fullname) {
+  const confirmed = confirm(
+    fullname + " ажилтны бүртгэлийг устгах уу?\n\n" +
+    "Хуучин танилцсан түүх хадгалагдана.\n" +
+    "Утасны дугаараар дахин бүртгүүлж болно."
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const result = await api(
+      "/api/admin/users/" + id,
+      "DELETE"
+    );
+
+    alert(result.message);
+    await loadUsers();
+
+  } catch (error) {
+    alert(error.message);
   }
 }
 
