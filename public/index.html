@@ -1,10 +1,10 @@
-
 <!DOCTYPE html>
 <html lang="mn">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ВЧД-3 цахим мэдээллийн систем</title>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 body{background:#eef3f9;color:#1c2e45}
@@ -57,7 +57,30 @@ textarea{min-height:110px;resize:vertical}
 .label-pending{background:#fff0d8;color:#946000}
 .label-done{background:#e5f6ed;color:#176b3d}
 .empty-report{padding:15px;background:#f5f9fd;border-radius:7px;color:#52677e}
+
+/* МЭДЭЭЛЛИЙН ГАРЧГААР ХАЙХ */
+.category-search-wrap{
+  margin:5px 0 18px;
+}
+.category-search-wrap label{
+  display:block;
+  color:#07518d;
+  font-weight:bold;
+  margin-bottom:5px;
+}
+.category-search-wrap input{
+  margin:5px 0 10px;
+  border:1px solid #b8cde0;
+  background:#fbfdff;
+}
+.search-result-count{
+  color:#718096;
+  font-size:13px;
+  margin-bottom:10px;
+}
+
 footer{text-align:center;color:#718096;padding:25px}
+
 @media(max-width:600px){
 header h1{font-size:20px}
 nav button{flex:1 1 40%}
@@ -67,6 +90,7 @@ nav button{flex:1 1 40%}
 }
 </style>
 </head>
+
 <body>
 
 <header>
@@ -87,32 +111,44 @@ nav button{flex:1 1 40%}
 
 <div class="container">
 
+<!-- НЭВТРЭХ БОЛОН БҮРТГҮҮЛЭХ -->
 <section id="authPanel">
+
 <div class="card">
 <h2>Системд нэвтрэх</h2>
+
 <label>Утасны дугаар</label>
 <input id="loginPhone" type="tel" placeholder="Утасны дугаар">
+
 <label>Нууц үг</label>
 <input id="loginPassword" type="password" placeholder="Нууц үг">
+
 <button class="main-btn" onclick="login()">Нэвтрэх</button>
 <p class="message" id="loginMessage"></p>
 </div>
 
 <div class="card">
 <h2>Ажилтны бүртгэл</h2>
+
 <label>Овог нэр</label>
 <input id="regName" placeholder="Овог нэр">
+
 <label>Утасны дугаар</label>
 <input id="regPhone" type="tel" placeholder="Утасны дугаар">
+
 <label>Байгууллага / хэсгийн нэр</label>
 <input id="regOrganization" placeholder="Жишээ: ВЧД-3, 1-р хэсэг">
+
 <label>Нууц үг</label>
 <input id="regPassword" type="password" placeholder="8-аас дээш тэмдэгт">
+
 <button class="main-btn" onclick="register()">Бүртгүүлэх</button>
 <p class="message" id="registerMessage"></p>
 </div>
+
 </section>
 
+<!-- НҮҮР -->
 <section id="homePanel" class="hidden">
 <div class="card">
 <h2>Тавтай морил!</h2>
@@ -122,14 +158,34 @@ nav button{flex:1 1 40%}
 </div>
 </section>
 
+<!-- АНГИЛЛЫН МЭДЭЭЛЭЛ -->
 <section id="categoryPanel" class="hidden">
 <div class="card">
+
 <h2 id="categoryTitle"></h2>
+
+<!-- ГАРЧГААР ХАЙХ ЦОНХ -->
+<div class="category-search-wrap">
+<label for="categorySearch">Мэдээллийн гарчгаар хайх</label>
+
+<input
+id="categorySearch"
+type="search"
+placeholder="🔍 Мэдээллийн гарчиг бичнэ үү..."
+oninput="filterCategoryPosts()"
+>
+
+<p id="categorySearchCount" class="search-result-count"></p>
+</div>
+
 <div id="postsList"></div>
+
 </div>
 </section>
 
+<!-- АДМИНЫ УДИРДЛАГА -->
 <section id="adminPanel" class="hidden">
+
 <div class="card">
 <h2>Админы удирдлага</h2>
 <div id="userList"></div>
@@ -137,6 +193,7 @@ nav button{flex:1 1 40%}
 
 <div class="card">
 <h2>Шинэ мэдээлэл оруулах</h2>
+
 <label>Мэдээллийн төрөл</label>
 <select id="postCategory">
 <option>ГТХАБ</option>
@@ -144,41 +201,63 @@ nav button{flex:1 1 40%}
 <option>Цахилгаан тушаал</option>
 <option>ХАБЭА</option>
 </select>
+
 <label>Гарчиг</label>
 <input id="postTitle" placeholder="Мэдээллийн гарчиг">
+
 <label>Мэдээлэл</label>
 <textarea id="postContent" placeholder="Мэдээллээ бичнэ үү"></textarea>
+
 <label>PDF болон зураг хавсаргах</label>
-<input id="postFiles" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
+<input
+id="postFiles"
+type="file"
+multiple
+accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+>
+
 <p class="file-note">Нийт 10 хүртэл файл. Нэг файл 10 MB-аас ихгүй байна.</p>
+
 <button class="main-btn" id="publishButton" onclick="createPost()">Нийтлэх</button>
 <p class="message" id="postMessage"></p>
 </div>
+
 </section>
 
-<!-- ШИНЭ ТАНИЛЦААГҮЙ АЖИЛТНЫ ТАЙЛАН -->
+<!-- ТАНИЛЦААГҮЙ АЖИЛТНЫ НЭГДСЭН ТАЙЛАН -->
 <section id="pendingPanel" class="hidden">
+
 <div class="card">
 <h2>Танилцаагүй ажилтнуудын нэгдсэн тайлан</h2>
+
 <p>Нийтэлсэн мэдээлэл бүртэй танилцсан болон танилцаагүй ажилтнуудын жагсаалт.</p>
 
 <div class="report-stats">
+
 <div class="stat-box">
 <strong id="reportTotalPosts">0</strong>
 <span>Нийт мэдээлэл</span>
 </div>
+
 <div class="stat-box">
 <strong id="reportTotalPending">0</strong>
 <span>Танилцаагүй бүртгэл</span>
 </div>
+
 <div class="stat-box">
 <strong id="reportTotalDone">0</strong>
 <span>Танилцсан бүртгэл</span>
 </div>
+
 </div>
 
 <label>Нэр эсвэл байгууллагаар хайх</label>
-<input id="reportSearch" class="report-search" placeholder="Ажилтны нэр, байгууллагын нэр..." oninput="renderPendingReport()">
+<input
+id="reportSearch"
+class="report-search"
+placeholder="Ажилтны нэр, байгууллагын нэр..."
+oninput="renderPendingReport()"
+>
 
 <label>Тайлангийн шүүлтүүр</label>
 <select id="reportFilter" onchange="renderPendingReport()">
@@ -192,6 +271,7 @@ nav button{flex:1 1 40%}
 
 <p class="message" id="reportMessage"></p>
 <div id="pendingReportList"></div>
+
 </div>
 </section>
 
@@ -206,6 +286,7 @@ let currentUser = null;
 let currentCategory = "";
 let pendingReportData = [];
 
+/* API ХОЛБОЛТ */
 async function api(url, method = "GET", data = null) {
   const options = {
     method,
@@ -230,25 +311,38 @@ async function api(url, method = "GET", data = null) {
   return result;
 }
 
+/* БҮХ ХЭСГИЙГ НУУХ */
 function hideAll() {
-  ["authPanel", "homePanel", "categoryPanel", "adminPanel", "pendingPanel"]
-    .forEach(id => document.getElementById(id).classList.add("hidden"));
+  [
+    "authPanel",
+    "homePanel",
+    "categoryPanel",
+    "adminPanel",
+    "pendingPanel"
+  ].forEach(id => {
+    document.getElementById(id).classList.add("hidden");
+  });
 }
 
+/* ХЭСЭГ СОЛИХ */
 function showPanel(name) {
-  if (["admin", "pending"].includes(name) &&
-      (!currentUser || !["admin", "superadmin"].includes(currentUser.role))) {
+  if (
+    ["admin", "pending"].includes(name) &&
+    (!currentUser || !["admin", "superadmin"].includes(currentUser.role))
+  ) {
     alert("Админы эрх шаардлагатай.");
     return;
   }
 
   hideAll();
+
   document.getElementById(name + "Panel").classList.remove("hidden");
 
   if (name === "admin") loadUsers();
   if (name === "pending") loadPendingReport();
 }
 
+/* ЦЭС ХАРУУЛАХ */
 function updateNavigation() {
   const isAdmin = currentUser &&
     ["admin", "superadmin"].includes(currentUser.role);
@@ -258,6 +352,7 @@ function updateNavigation() {
   document.getElementById("reportMenu").classList.toggle("hidden", !isAdmin);
 }
 
+/* АЖИЛТАН БҮРТГҮҮЛЭХ */
 async function register() {
   const message = document.getElementById("registerMessage");
   message.textContent = "";
@@ -271,15 +366,18 @@ async function register() {
     });
 
     message.textContent = result.message;
+
     document.getElementById("regName").value = "";
     document.getElementById("regPhone").value = "";
     document.getElementById("regOrganization").value = "";
     document.getElementById("regPassword").value = "";
+
   } catch (error) {
     message.textContent = error.message;
   }
 }
 
+/* НЭВТРЭХ */
 async function login() {
   const message = document.getElementById("loginMessage");
   message.textContent = "";
@@ -294,15 +392,18 @@ async function login() {
     updateNavigation();
 
     document.getElementById("authPanel").classList.add("hidden");
+
     document.getElementById("welcomeText").textContent =
       currentUser.fullname + " — амжилттай нэвтэрлээ.";
 
     showPanel("home");
+
   } catch (error) {
     message.textContent = error.message;
   }
 }
 
+/* ГАРАХ */
 async function logout() {
   try {
     await api("/api/logout", "POST");
@@ -313,28 +414,40 @@ async function logout() {
   currentUser = null;
   currentCategory = "";
   pendingReportData = [];
+
   updateNavigation();
   hideAll();
+
   document.getElementById("authPanel").classList.remove("hidden");
   document.getElementById("loginPassword").value = "";
 }
 
+/* ОГНОО ХАРУУЛАХ */
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleString("mn-MN");
 }
 
+/* АНГИЛЛЫН МЭДЭЭЛЭЛ ХАРУУЛАХ */
 async function showCategory(category) {
   currentCategory = category;
+
   hideAll();
+
   document.getElementById("categoryPanel").classList.remove("hidden");
   document.getElementById("categoryTitle").textContent = category;
+
+  const searchInput = document.getElementById("categorySearch");
+  searchInput.value = "";
+
+  document.getElementById("categorySearchCount").textContent = "";
 
   const list = document.getElementById("postsList");
   list.textContent = "Мэдээлэл ачаалж байна...";
 
   try {
     const posts = await api("/api/posts");
+
     const filtered = posts.filter(post => post.category === category);
 
     list.replaceChildren();
@@ -348,6 +461,9 @@ async function showCategory(category) {
       const article = document.createElement("article");
       article.className = "post";
 
+      /* ХАЙЛТАД АШИГЛАХ ГАРЧИГ */
+      article.dataset.title = post.title || "";
+
       const heading = document.createElement("h3");
       heading.textContent = post.title;
 
@@ -359,8 +475,10 @@ async function showCategory(category) {
 
       article.append(heading, content, date);
 
+      /* ХАВСАРГАСАН ФАЙЛ */
       const files = Array.isArray(post.attachments)
-        ? post.attachments : [];
+        ? post.attachments
+        : [];
 
       if (files.length > 0) {
         const fileBox = document.createElement("div");
@@ -368,17 +486,23 @@ async function showCategory(category) {
 
         const label = document.createElement("strong");
         label.textContent = "Хавсаргасан файлууд:";
+
         fileBox.appendChild(label);
 
         files.forEach((file, index) => {
           const link = document.createElement("a");
-          link.href = "/api/posts/" + post.id +
+
+          link.href =
+            "/api/posts/" + post.id +
             "/attachments/" + index;
+
           link.target = "_blank";
           link.rel = "noopener";
+
           link.textContent =
             (file.type === "application/pdf" ? "📄 " : "🖼️ ") +
             file.name + " — Нээх / татах";
+
           fileBox.appendChild(link);
         });
 
@@ -390,6 +514,7 @@ async function showCategory(category) {
 
       const isAdmin = ["admin", "superadmin"].includes(currentUser.role);
 
+      /* АДМИНЫ ҮЙЛДЛҮҮД */
       if (isAdmin) {
         const reportBox = document.createElement("div");
         reportBox.className = "ack-report hidden";
@@ -398,29 +523,44 @@ async function showCategory(category) {
         const reportButton = document.createElement("button");
         reportButton.className = "main-btn";
         reportButton.textContent = "Танилцсан тайлан";
-        reportButton.onclick = () => loadAcknowledgements(post.id, reportBox);
+
+        reportButton.onclick = () => {
+          loadAcknowledgements(post.id, reportBox);
+        };
 
         const deleteButton = document.createElement("button");
         deleteButton.className = "main-btn danger";
         deleteButton.textContent = "🗑 Устгах";
+
         deleteButton.onclick = () => deletePost(post.id);
 
         actions.append(reportButton, deleteButton);
+
         article.appendChild(actions);
         article.appendChild(reportBox);
+
       } else {
+
+        /* АЖИЛТНЫ ТАНИЛЦСАН ТӨЛӨВ */
         if (post.my_acknowledged_at) {
           const done = document.createElement("div");
           done.className = "ack-done";
+
           done.textContent =
             "✓ Та энэ мэдээлэлтэй танилцсан. Огноо: " +
             formatDate(post.my_acknowledged_at);
+
           article.appendChild(done);
+
         } else {
           const ackButton = document.createElement("button");
           ackButton.className = "main-btn success";
           ackButton.textContent = "✓ Танилцсан";
-          ackButton.onclick = () => acknowledgePost(post.id, ackButton);
+
+          ackButton.onclick = () => {
+            acknowledgePost(post.id, ackButton);
+          };
+
           actions.appendChild(ackButton);
           article.appendChild(actions);
         }
@@ -428,12 +568,67 @@ async function showCategory(category) {
 
       list.appendChild(article);
     });
+
+    /* ЭХНИЙ ҮЕД ХАЙЛТЫН ТООГ ШИНЭЧЛЭХ */
+    filterCategoryPosts();
+
   } catch (error) {
     list.textContent = error.message;
   }
 }
 
-// ТАНИЛЦСАН БҮРТГЭЛ
+/* МЭДЭЭЛЛИЙН ГАРЧГААР ХАЙХ */
+function filterCategoryPosts() {
+  const searchInput = document.getElementById("categorySearch");
+
+  const search = searchInput.value
+    .trim()
+    .toLocaleLowerCase("mn-MN");
+
+  const posts = document.querySelectorAll("#postsList .post");
+
+  let visibleCount = 0;
+
+  posts.forEach(post => {
+    const title = (post.dataset.title || "")
+      .toLocaleLowerCase("mn-MN");
+
+    const matches = title.includes(search);
+
+    post.style.display = matches ? "" : "none";
+
+    if (matches) {
+      visibleCount++;
+    }
+  });
+
+  const countText = document.getElementById("categorySearchCount");
+
+  if (search) {
+    countText.textContent =
+      "Хайлтад тохирсон мэдээлэл: " + visibleCount;
+  } else {
+    countText.textContent =
+      "Нийт мэдээлэл: " + visibleCount;
+  }
+
+  let emptyMessage = document.getElementById("categorySearchEmpty");
+
+  if (!emptyMessage) {
+    emptyMessage = document.createElement("div");
+    emptyMessage.id = "categorySearchEmpty";
+    emptyMessage.className = "empty-report";
+    emptyMessage.textContent =
+      "Таны хайсан гарчигтай мэдээлэл олдсонгүй.";
+
+    document.getElementById("postsList").appendChild(emptyMessage);
+  }
+
+  emptyMessage.style.display =
+    search && visibleCount === 0 ? "block" : "none";
+}
+
+/* ТАНИЛЦСАН БҮРТГЭЛ */
 async function acknowledgePost(postId, button) {
   if (!confirm("Та энэ мэдээлэлтэй танилцсан гэдгээ баталгаажуулах уу?")) {
     return;
@@ -451,14 +646,16 @@ async function acknowledgePost(postId, button) {
 
     alert(result.message);
     await showCategory(currentCategory);
+
   } catch (error) {
     alert(error.message);
+
     button.disabled = false;
     button.textContent = "✓ Танилцсан";
   }
 }
 
-// НЭГ НИЙТЛЭЛИЙН ТАНИЛЦСАН ТАЙЛАН
+/* НЭГ НИЙТЛЭЛИЙН ТАНИЛЦСАН ТАЙЛАН */
 async function loadAcknowledgements(postId, container) {
   if (!container.classList.contains("hidden")) {
     container.classList.add("hidden");
@@ -480,6 +677,7 @@ async function loadAcknowledgements(postId, container) {
 
     const summary = document.createElement("div");
     summary.className = "ack-summary";
+
     summary.textContent =
       "Нийт ажилтан: " + users.length +
       " | Танилцсан: " + acknowledged.length +
@@ -489,6 +687,7 @@ async function loadAcknowledgements(postId, container) {
 
     const doneTitle = document.createElement("h4");
     doneTitle.textContent = "✓ Танилцсан ажилтнууд";
+
     container.appendChild(doneTitle);
 
     if (acknowledged.length === 0) {
@@ -500,17 +699,20 @@ async function loadAcknowledgements(postId, container) {
     acknowledged.forEach(user => {
       const item = document.createElement("div");
       item.className = "ack-item";
+
       item.textContent =
         user.fullname +
         " | Байгууллага: " + (user.organization || "Тодорхойгүй") +
         " | Утас: " + user.phone +
         " | " + formatDate(user.acknowledged_at) +
         (user.status === "deleted" ? " | (хуучин бүртгэл)" : "");
+
       container.appendChild(item);
     });
 
     const pendingTitle = document.createElement("h4");
     pendingTitle.textContent = "○ Танилцаагүй ажилтнууд";
+
     container.appendChild(pendingTitle);
 
     if (notAcknowledged.length === 0) {
@@ -522,10 +724,12 @@ async function loadAcknowledgements(postId, container) {
     notAcknowledged.forEach(user => {
       const item = document.createElement("div");
       item.className = "ack-item";
+
       item.textContent =
         user.fullname +
         " | Байгууллага: " + (user.organization || "Тодорхойгүй") +
         " | Утас: " + user.phone;
+
       container.appendChild(item);
     });
 
@@ -534,7 +738,7 @@ async function loadAcknowledgements(postId, container) {
   }
 }
 
-// НИЙТЛЭЛ УСТГАХ
+/* НИЙТЛЭЛ УСТГАХ */
 async function deletePost(postId) {
   if (!confirm("Энэ нийтлэл болон хавсаргасан файлуудыг устгах уу?")) {
     return;
@@ -548,18 +752,20 @@ async function deletePost(postId) {
 
     alert(result.message);
     await showCategory(currentCategory);
+
   } catch (error) {
     alert(error.message);
   }
 }
 
-// ХЭРЭГЛЭГЧДИЙН ЖАГСААЛТ
+/* ХЭРЭГЛЭГЧДИЙН ЖАГСААЛТ */
 async function loadUsers() {
   const list = document.getElementById("userList");
   list.textContent = "Бүртгэлүүдийг ачаалж байна...";
 
   try {
     const users = await api("/api/admin/users");
+
     list.replaceChildren();
 
     if (users.length === 0) {
@@ -572,27 +778,33 @@ async function loadUsers() {
       row.className = "user-row";
 
       const info = document.createElement("p");
+
       info.textContent =
         user.fullname +
         " | Байгууллага: " + (user.organization || "Тодорхойгүй") +
         " | Утас: " + user.phone +
         " | " + user.role + " | " + user.status;
+
       row.appendChild(info);
 
+      /* БҮРТГЭЛ ЗӨВШӨӨРӨХ / ТАТГАЛЗАХ */
       if (user.role === "employee" && user.status === "pending") {
         const approve = document.createElement("button");
         approve.className = "main-btn success";
         approve.textContent = "Зөвшөөрөх";
+
         approve.onclick = () => updateUser(user.id, "approved");
 
         const reject = document.createElement("button");
         reject.className = "main-btn danger";
         reject.textContent = "Татгалзах";
+
         reject.onclick = () => updateUser(user.id, "rejected");
 
         row.append(approve, reject);
       }
 
+      /* АДМИН БОЛГОХ */
       if (
         currentUser.role === "superadmin" &&
         user.role === "employee" &&
@@ -601,10 +813,13 @@ async function loadUsers() {
         const promote = document.createElement("button");
         promote.className = "main-btn";
         promote.textContent = "Админ болгох";
+
         promote.onclick = () => promoteUser(user.id);
+
         row.appendChild(promote);
       }
 
+      /* АДМИНЫ ЭРХ ЦУЦЛАХ */
       if (
         currentUser.role === "superadmin" &&
         user.role === "admin"
@@ -612,15 +827,22 @@ async function loadUsers() {
         const demote = document.createElement("button");
         demote.className = "main-btn danger";
         demote.textContent = "Админы эрх цуцлах";
+
         demote.onclick = () => demoteUser(user.id);
+
         row.appendChild(demote);
       }
 
+      /* АЖИЛТАН УСТГАХ */
       if (user.role === "employee" && user.status !== "deleted") {
         const deleteButton = document.createElement("button");
         deleteButton.className = "main-btn danger";
         deleteButton.textContent = "🗑 Устгах";
-        deleteButton.onclick = () => deleteUser(user.id, user.fullname);
+
+        deleteButton.onclick = () => {
+          deleteUser(user.id, user.fullname);
+        };
+
         row.appendChild(deleteButton);
       }
 
@@ -632,7 +854,7 @@ async function loadUsers() {
   }
 }
 
-// АЖИЛТНЫН БҮРТГЭЛ ЗӨӨЛНӨӨР УСТГАХ
+/* АЖИЛТНЫН БҮРТГЭЛ ЗӨӨЛНӨӨР УСТГАХ */
 async function deleteUser(id, fullname) {
   const confirmed = confirm(
     fullname + " ажилтны бүртгэлийг устгах уу?\n\n" +
@@ -643,14 +865,20 @@ async function deleteUser(id, fullname) {
   if (!confirmed) return;
 
   try {
-    const result = await api("/api/admin/users/" + id, "DELETE");
+    const result = await api(
+      "/api/admin/users/" + id,
+      "DELETE"
+    );
+
     alert(result.message);
     await loadUsers();
+
   } catch (error) {
     alert(error.message);
   }
 }
 
+/* АЖИЛТНЫ ТӨЛӨВ ӨӨРЧЛӨХ */
 async function updateUser(id, status) {
   try {
     const result = await api(
@@ -658,13 +886,16 @@ async function updateUser(id, status) {
       "PATCH",
       { status }
     );
+
     alert(result.message);
     loadUsers();
+
   } catch (error) {
     alert(error.message);
   }
 }
 
+/* АДМИН БОЛГОХ */
 async function promoteUser(id) {
   try {
     const result = await api(
@@ -672,13 +903,16 @@ async function promoteUser(id) {
       "PATCH",
       {}
     );
+
     alert(result.message);
     loadUsers();
+
   } catch (error) {
     alert(error.message);
   }
 }
 
+/* АДМИНЫ ЭРХ ЦУЦЛАХ */
 async function demoteUser(id) {
   try {
     const result = await api(
@@ -686,17 +920,20 @@ async function demoteUser(id) {
       "PATCH",
       {}
     );
+
     alert(result.message);
     loadUsers();
+
   } catch (error) {
     alert(error.message);
   }
 }
 
-// ШИНЭ МЭДЭЭЛЭЛ НИЙТЛЭХ
+/* ШИНЭ МЭДЭЭЛЭЛ НИЙТЛЭХ */
 async function createPost() {
   const message = document.getElementById("postMessage");
   const button = document.getElementById("publishButton");
+
   message.textContent = "";
 
   const files = document.getElementById("postFiles").files;
@@ -708,15 +945,28 @@ async function createPost() {
 
   for (const file of files) {
     if (file.size > 10 * 1024 * 1024) {
-      message.textContent = file.name + " файл 10 MB-аас их байна.";
+      message.textContent =
+        file.name + " файл 10 MB-аас их байна.";
       return;
     }
   }
 
   const formData = new FormData();
-  formData.append("category", document.getElementById("postCategory").value);
-  formData.append("title", document.getElementById("postTitle").value);
-  formData.append("content", document.getElementById("postContent").value);
+
+  formData.append(
+    "category",
+    document.getElementById("postCategory").value
+  );
+
+  formData.append(
+    "title",
+    document.getElementById("postTitle").value
+  );
+
+  formData.append(
+    "content",
+    document.getElementById("postContent").value
+  );
 
   for (const file of files) {
     formData.append("files", file);
@@ -726,27 +976,36 @@ async function createPost() {
   button.textContent = "Нийтэлж байна...";
 
   try {
-    const result = await api("/api/posts", "POST", formData);
+    const result = await api(
+      "/api/posts",
+      "POST",
+      formData
+    );
 
-    message.textContent = result.message || "Амжилттай нийтлэгдлээ.";
+    message.textContent =
+      result.message || "Амжилттай нийтлэгдлээ.";
+
     document.getElementById("postTitle").value = "";
     document.getElementById("postContent").value = "";
     document.getElementById("postFiles").value = "";
+
   } catch (error) {
     message.textContent = error.message;
+
   } finally {
     button.disabled = false;
     button.textContent = "Нийтлэх";
   }
 }
 
-// ШИНЭ: БҮХ МЭДЭЭЛЛИЙН ТАНИЛЦААГҮЙ АЖИЛТНЫ НЭГДСЭН ТАЙЛАН
+/* БҮХ МЭДЭЭЛЛИЙН ТАНИЛЦААГҮЙ АЖИЛТНЫ НЭГДСЭН ТАЙЛАН */
 async function loadPendingReport() {
   const message = document.getElementById("reportMessage");
   const list = document.getElementById("pendingReportList");
 
   message.textContent = "Тайлан ачаалж байна...";
   list.replaceChildren();
+
   pendingReportData = [];
 
   try {
@@ -770,30 +1029,41 @@ async function loadPendingReport() {
     pendingReportData = reports;
 
     const totalPending = reports.reduce(
-      (sum, report) => sum + report.pending.length, 0
+      (sum, report) => sum + report.pending.length,
+      0
     );
 
     const totalDone = reports.reduce(
-      (sum, report) => sum + report.acknowledged.length, 0
+      (sum, report) => sum + report.acknowledged.length,
+      0
     );
 
-    document.getElementById("reportTotalPosts").textContent = posts.length;
-    document.getElementById("reportTotalPending").textContent = totalPending;
-    document.getElementById("reportTotalDone").textContent = totalDone;
+    document.getElementById("reportTotalPosts").textContent =
+      posts.length;
+
+    document.getElementById("reportTotalPending").textContent =
+      totalPending;
+
+    document.getElementById("reportTotalDone").textContent =
+      totalDone;
 
     message.textContent = "Тайлан шинэчлэгдлээ.";
+
     renderPendingReport();
 
   } catch (error) {
-    message.textContent = "Тайлан авахад алдаа гарлаа: " + error.message;
+    message.textContent =
+      "Тайлан авахад алдаа гарлаа: " + error.message;
   }
 }
 
-// ХАЙЛТ БА ШҮҮЛТҮҮР
+/* ТАЙЛАНГИЙН ХАЙЛТ БА ШҮҮЛТҮҮР */
 function renderPendingReport() {
   const list = document.getElementById("pendingReportList");
+
   const search = document.getElementById("reportSearch").value
-    .trim().toLocaleLowerCase("mn-MN");
+    .trim()
+    .toLocaleLowerCase("mn-MN");
 
   const filter = document.getElementById("reportFilter").value;
 
@@ -833,11 +1103,14 @@ function renderPendingReport() {
     title.textContent = report.post.title;
 
     const category = document.createElement("p");
+
     category.textContent =
-      report.post.category + " | " + formatDate(report.post.created_at);
+      report.post.category + " | " +
+      formatDate(report.post.created_at);
 
     const summary = document.createElement("div");
     summary.className = "ack-summary";
+
     summary.textContent =
       "Нийт: " + report.users.length +
       " | Танилцсан: " + report.acknowledged.length +
@@ -850,7 +1123,9 @@ function renderPendingReport() {
       item.className = "report-person";
 
       const status = document.createElement("span");
-      status.className = "report-label " +
+
+      status.className =
+        "report-label " +
         (user.acknowledged ? "label-done" : "label-pending");
 
       status.textContent = user.acknowledged
@@ -858,6 +1133,7 @@ function renderPendingReport() {
         : "ТАНИЛЦААГҮЙ";
 
       const info = document.createElement("div");
+
       info.textContent =
         user.fullname +
         " | " + (user.organization || "Байгууллага тодорхойгүй") +
@@ -867,9 +1143,12 @@ function renderPendingReport() {
 
       if (user.acknowledged) {
         const date = document.createElement("small");
-        date.textContent = "Танилцсан огноо: " +
+
+        date.textContent =
+          "Танилцсан огноо: " +
           formatDate(user.acknowledged_at) +
           (user.status === "deleted" ? " (хуучин бүртгэл)" : "");
+
         item.appendChild(date);
       }
 
@@ -881,13 +1160,17 @@ function renderPendingReport() {
 
   if (visibleCount === 0) {
     const empty = document.createElement("div");
+
     empty.className = "empty-report";
-    empty.textContent = "Таны хайлт, сонгосон шүүлтүүрт тохирох ажилтан олдсонгүй.";
+
+    empty.textContent =
+      "Таны хайлт, сонгосон шүүлтүүрт тохирох ажилтан олдсонгүй.";
+
     list.appendChild(empty);
   }
 }
 
-// EXCEL-Д НЭЭХ CSV ТАЙЛАН ТАТАХ
+/* EXCEL-Д НЭЭХ CSV ТАЙЛАН ТАТАХ */
 function downloadPendingCSV() {
   if (!pendingReportData.length) {
     alert("Татах тайлан байхгүй байна. Эхлээд тайлангаа шинэчилнэ үү.");
@@ -908,7 +1191,11 @@ function downloadPendingCSV() {
 
   function safeCell(value) {
     let text = String(value ?? "");
-    if (/^[=+\-@]/.test(text)) text = "'" + text;
+
+    if (/^[=+\-@]/.test(text)) {
+      text = "'" + text;
+    }
+
     return '"' + text.replace(/"/g, '""') + '"';
   }
 
@@ -938,8 +1225,11 @@ function downloadPendingCSV() {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = "VCHD3_taniltsan_tailan_" +
-    new Date().toISOString().slice(0, 10) + ".csv";
+
+  link.download =
+    "VCHD3_taniltsan_tailan_" +
+    new Date().toISOString().slice(0, 10) +
+    ".csv";
 
   document.body.appendChild(link);
   link.click();
@@ -948,27 +1238,32 @@ function downloadPendingCSV() {
   URL.revokeObjectURL(url);
 }
 
-// ӨМНӨ НЭВТЭРСЭН ЭСЭХИЙГ ШАЛГАХ
+/* ӨМНӨ НЭВТЭРСЭН ЭСЭХИЙГ ШАЛГАХ */
 async function checkSession() {
   try {
     const result = await api("/api/me");
 
     if (result.user) {
       currentUser = result.user;
+
       updateNavigation();
 
       document.getElementById("authPanel").classList.add("hidden");
+
       document.getElementById("welcomeText").textContent =
         currentUser.fullname + " — тавтай морил.";
 
       showPanel("home");
     }
+
   } catch (error) {
     console.error(error);
   }
 }
 
+/* СИСТЕМ ЭХЛҮҮЛЭХ */
 checkSession();
+
 </script>
 
 </body>
