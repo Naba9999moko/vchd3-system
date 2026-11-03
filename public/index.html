@@ -14,9 +14,10 @@ header p{opacity:.9}
 nav{background:white;display:flex;justify-content:center;flex-wrap:wrap;gap:10px;padding:15px;box-shadow:0 2px 8px #00000012}
 nav button{border:0;background:#e6f0fa;color:#07518d;padding:12px 18px;border-radius:8px;cursor:pointer;font-weight:bold}
 nav button:hover,nav button.active{background:#0877bd;color:white}
-.container{max-width:950px;margin:25px auto;padding:15px}
+.container{max-width:1100px;margin:25px auto;padding:15px}
 .card{background:white;border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:0 3px 12px #173b5b12}
 h2{color:#07518d;margin-bottom:18px}
+h3{color:#07518d}
 input,textarea,select{width:100%;padding:12px;margin:8px 0 15px;border:1px solid #ccd8e5;border-radius:7px;font-size:15px}
 textarea{min-height:110px;resize:vertical}
 .main-btn{background:#0877bd;color:white;border:0;padding:12px 20px;border-radius:7px;cursor:pointer;font-weight:bold;margin:4px}
@@ -42,12 +43,27 @@ textarea{min-height:110px;resize:vertical}
 .ack-report h4{color:#07518d;margin:12px 0 8px}
 .ack-item{padding:8px;border-bottom:1px solid #e7edf3;font-size:14px}
 .ack-summary{background:#eaf3fc;padding:10px;border-radius:7px;margin-bottom:10px;font-weight:bold}
+.report-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0}
+.stat-box{background:#eaf3fc;border-radius:9px;padding:16px;text-align:center}
+.stat-box strong{display:block;font-size:25px;color:#07518d;margin-bottom:5px}
+.stat-box span{font-size:13px;color:#52677e}
+.report-post{border:1px solid #d8e4ef;border-radius:9px;padding:15px;margin:15px 0}
+.report-post h3{margin-bottom:10px}
+.report-post h4{margin:14px 0 8px;color:#07518d}
+.report-person{padding:10px;border-bottom:1px solid #e7edf3;font-size:14px;line-height:1.6}
+.report-person:last-child{border-bottom:0}
+.report-search{margin:12px 0}
+.report-label{display:inline-block;padding:5px 9px;border-radius:5px;font-size:12px;font-weight:bold}
+.label-pending{background:#fff0d8;color:#946000}
+.label-done{background:#e5f6ed;color:#176b3d}
+.empty-report{padding:15px;background:#f5f9fd;border-radius:7px;color:#52677e}
 footer{text-align:center;color:#718096;padding:25px}
 @media(max-width:600px){
 header h1{font-size:20px}
 nav button{flex:1 1 40%}
 .card{padding:16px}
 .main-btn{padding:11px 13px}
+.report-stats{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -65,6 +81,7 @@ nav button{flex:1 1 40%}
 <button onclick="showCategory('ХАБЭА')">ХАБЭА</button>
 <button onclick="showPanel('home')">Нүүр</button>
 <button id="adminMenu" class="hidden" onclick="showPanel('admin')">Админ</button>
+<button id="reportMenu" class="hidden" onclick="showPanel('pending')">Танилцаагүй ажилтнууд</button>
 <button onclick="logout()">Гарах</button>
 </nav>
 
@@ -85,16 +102,12 @@ nav button{flex:1 1 40%}
 <h2>Ажилтны бүртгэл</h2>
 <label>Овог нэр</label>
 <input id="regName" placeholder="Овог нэр">
-
 <label>Утасны дугаар</label>
 <input id="regPhone" type="tel" placeholder="Утасны дугаар">
-
 <label>Байгууллага / хэсгийн нэр</label>
 <input id="regOrganization" placeholder="Жишээ: ВЧД-3, 1-р хэсэг">
-
 <label>Нууц үг</label>
 <input id="regPassword" type="password" placeholder="8-аас дээш тэмдэгт">
-
 <button class="main-btn" onclick="register()">Бүртгүүлэх</button>
 <p class="message" id="registerMessage"></p>
 </div>
@@ -124,7 +137,6 @@ nav button{flex:1 1 40%}
 
 <div class="card">
 <h2>Шинэ мэдээлэл оруулах</h2>
-
 <label>Мэдээллийн төрөл</label>
 <select id="postCategory">
 <option>ГТХАБ</option>
@@ -132,19 +144,54 @@ nav button{flex:1 1 40%}
 <option>Цахилгаан тушаал</option>
 <option>ХАБЭА</option>
 </select>
-
 <label>Гарчиг</label>
 <input id="postTitle" placeholder="Мэдээллийн гарчиг">
-
 <label>Мэдээлэл</label>
 <textarea id="postContent" placeholder="Мэдээллээ бичнэ үү"></textarea>
-
 <label>PDF болон зураг хавсаргах</label>
 <input id="postFiles" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
 <p class="file-note">Нийт 10 хүртэл файл. Нэг файл 10 MB-аас ихгүй байна.</p>
-
 <button class="main-btn" id="publishButton" onclick="createPost()">Нийтлэх</button>
 <p class="message" id="postMessage"></p>
+</div>
+</section>
+
+<!-- ШИНЭ ТАНИЛЦААГҮЙ АЖИЛТНЫ ТАЙЛАН -->
+<section id="pendingPanel" class="hidden">
+<div class="card">
+<h2>Танилцаагүй ажилтнуудын нэгдсэн тайлан</h2>
+<p>Нийтэлсэн мэдээлэл бүртэй танилцсан болон танилцаагүй ажилтнуудын жагсаалт.</p>
+
+<div class="report-stats">
+<div class="stat-box">
+<strong id="reportTotalPosts">0</strong>
+<span>Нийт мэдээлэл</span>
+</div>
+<div class="stat-box">
+<strong id="reportTotalPending">0</strong>
+<span>Танилцаагүй бүртгэл</span>
+</div>
+<div class="stat-box">
+<strong id="reportTotalDone">0</strong>
+<span>Танилцсан бүртгэл</span>
+</div>
+</div>
+
+<label>Нэр эсвэл байгууллагаар хайх</label>
+<input id="reportSearch" class="report-search" placeholder="Ажилтны нэр, байгууллагын нэр..." oninput="renderPendingReport()">
+
+<label>Тайлангийн шүүлтүүр</label>
+<select id="reportFilter" onchange="renderPendingReport()">
+<option value="pending">Зөвхөн танилцаагүй ажилтнууд</option>
+<option value="all">Бүх ажилтан</option>
+<option value="done">Зөвхөн танилцсан ажилтнууд</option>
+</select>
+
+<button class="main-btn" onclick="downloadPendingCSV()">📥 Excel тайлан татах</button>
+<button class="main-btn" onclick="loadPendingReport()">↻ Шинэчлэх</button>
+
+<p class="message" id="reportMessage"></p>
+<div id="pendingReportList"></div>
 </div>
 </section>
 
@@ -157,6 +204,7 @@ nav button{flex:1 1 40%}
 <script>
 let currentUser = null;
 let currentCategory = "";
+let pendingReportData = [];
 
 async function api(url, method = "GET", data = null) {
   const options = {
@@ -183,17 +231,22 @@ async function api(url, method = "GET", data = null) {
 }
 
 function hideAll() {
-  ["authPanel", "homePanel", "categoryPanel", "adminPanel"]
+  ["authPanel", "homePanel", "categoryPanel", "adminPanel", "pendingPanel"]
     .forEach(id => document.getElementById(id).classList.add("hidden"));
 }
 
 function showPanel(name) {
+  if (["admin", "pending"].includes(name) &&
+      (!currentUser || !["admin", "superadmin"].includes(currentUser.role))) {
+    alert("Админы эрх шаардлагатай.");
+    return;
+  }
+
   hideAll();
   document.getElementById(name + "Panel").classList.remove("hidden");
 
-  if (name === "admin") {
-    loadUsers();
-  }
+  if (name === "admin") loadUsers();
+  if (name === "pending") loadPendingReport();
 }
 
 function updateNavigation() {
@@ -202,6 +255,7 @@ function updateNavigation() {
 
   document.getElementById("navigation").classList.toggle("hidden", !currentUser);
   document.getElementById("adminMenu").classList.toggle("hidden", !isAdmin);
+  document.getElementById("reportMenu").classList.toggle("hidden", !isAdmin);
 }
 
 async function register() {
@@ -258,6 +312,7 @@ async function logout() {
 
   currentUser = null;
   currentCategory = "";
+  pendingReportData = [];
   updateNavigation();
   hideAll();
   document.getElementById("authPanel").classList.remove("hidden");
@@ -403,7 +458,7 @@ async function acknowledgePost(postId, button) {
   }
 }
 
-// ТАНИЛЦСАН ТАЙЛАН
+// НЭГ НИЙТЛЭЛИЙН ТАНИЛЦСАН ТАЙЛАН
 async function loadAcknowledgements(postId, container) {
   if (!container.classList.contains("hidden")) {
     container.classList.add("hidden");
@@ -445,14 +500,12 @@ async function loadAcknowledgements(postId, container) {
     acknowledged.forEach(user => {
       const item = document.createElement("div");
       item.className = "ack-item";
-
       item.textContent =
         user.fullname +
         " | Байгууллага: " + (user.organization || "Тодорхойгүй") +
         " | Утас: " + user.phone +
         " | " + formatDate(user.acknowledged_at) +
         (user.status === "deleted" ? " | (хуучин бүртгэл)" : "");
-
       container.appendChild(item);
     });
 
@@ -563,11 +616,7 @@ async function loadUsers() {
         row.appendChild(demote);
       }
 
-      // АДМИН БОЛОН ҮНДСЭН АДМИН АЖИЛТНЫГ УСТГАХ
-      if (
-        user.role === "employee" &&
-        user.status !== "deleted"
-      ) {
+      if (user.role === "employee" && user.status !== "deleted") {
         const deleteButton = document.createElement("button");
         deleteButton.className = "main-btn danger";
         deleteButton.textContent = "🗑 Устгах";
@@ -594,14 +643,9 @@ async function deleteUser(id, fullname) {
   if (!confirmed) return;
 
   try {
-    const result = await api(
-      "/api/admin/users/" + id,
-      "DELETE"
-    );
-
+    const result = await api("/api/admin/users/" + id, "DELETE");
     alert(result.message);
     await loadUsers();
-
   } catch (error) {
     alert(error.message);
   }
@@ -694,6 +738,214 @@ async function createPost() {
     button.disabled = false;
     button.textContent = "Нийтлэх";
   }
+}
+
+// ШИНЭ: БҮХ МЭДЭЭЛЛИЙН ТАНИЛЦААГҮЙ АЖИЛТНЫ НЭГДСЭН ТАЙЛАН
+async function loadPendingReport() {
+  const message = document.getElementById("reportMessage");
+  const list = document.getElementById("pendingReportList");
+
+  message.textContent = "Тайлан ачаалж байна...";
+  list.replaceChildren();
+  pendingReportData = [];
+
+  try {
+    const posts = await api("/api/posts");
+
+    const reports = await Promise.all(
+      posts.map(async post => {
+        const users = await api(
+          "/api/posts/" + post.id + "/acknowledgements"
+        );
+
+        return {
+          post,
+          users,
+          acknowledged: users.filter(user => user.acknowledged),
+          pending: users.filter(user => !user.acknowledged)
+        };
+      })
+    );
+
+    pendingReportData = reports;
+
+    const totalPending = reports.reduce(
+      (sum, report) => sum + report.pending.length, 0
+    );
+
+    const totalDone = reports.reduce(
+      (sum, report) => sum + report.acknowledged.length, 0
+    );
+
+    document.getElementById("reportTotalPosts").textContent = posts.length;
+    document.getElementById("reportTotalPending").textContent = totalPending;
+    document.getElementById("reportTotalDone").textContent = totalDone;
+
+    message.textContent = "Тайлан шинэчлэгдлээ.";
+    renderPendingReport();
+
+  } catch (error) {
+    message.textContent = "Тайлан авахад алдаа гарлаа: " + error.message;
+  }
+}
+
+// ХАЙЛТ БА ШҮҮЛТҮҮР
+function renderPendingReport() {
+  const list = document.getElementById("pendingReportList");
+  const search = document.getElementById("reportSearch").value
+    .trim().toLocaleLowerCase("mn-MN");
+
+  const filter = document.getElementById("reportFilter").value;
+
+  list.replaceChildren();
+
+  if (pendingReportData.length === 0) {
+    list.textContent = "Одоогоор мэдээлэл алга.";
+    return;
+  }
+
+  let visibleCount = 0;
+
+  pendingReportData.forEach(report => {
+    const filteredUsers = report.users.filter(user => {
+      const matchesSearch =
+        !search ||
+        user.fullname.toLocaleLowerCase("mn-MN").includes(search) ||
+        (user.organization || "").toLocaleLowerCase("mn-MN").includes(search) ||
+        user.phone.includes(search);
+
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "pending" && !user.acknowledged) ||
+        (filter === "done" && user.acknowledged);
+
+      return matchesSearch && matchesFilter;
+    });
+
+    if (filteredUsers.length === 0) return;
+
+    visibleCount++;
+
+    const box = document.createElement("div");
+    box.className = "report-post";
+
+    const title = document.createElement("h3");
+    title.textContent = report.post.title;
+
+    const category = document.createElement("p");
+    category.textContent =
+      report.post.category + " | " + formatDate(report.post.created_at);
+
+    const summary = document.createElement("div");
+    summary.className = "ack-summary";
+    summary.textContent =
+      "Нийт: " + report.users.length +
+      " | Танилцсан: " + report.acknowledged.length +
+      " | Танилцаагүй: " + report.pending.length;
+
+    box.append(title, category, summary);
+
+    filteredUsers.forEach(user => {
+      const item = document.createElement("div");
+      item.className = "report-person";
+
+      const status = document.createElement("span");
+      status.className = "report-label " +
+        (user.acknowledged ? "label-done" : "label-pending");
+
+      status.textContent = user.acknowledged
+        ? "ТАНИЛЦСАН"
+        : "ТАНИЛЦААГҮЙ";
+
+      const info = document.createElement("div");
+      info.textContent =
+        user.fullname +
+        " | " + (user.organization || "Байгууллага тодорхойгүй") +
+        " | " + user.phone;
+
+      item.append(status, info);
+
+      if (user.acknowledged) {
+        const date = document.createElement("small");
+        date.textContent = "Танилцсан огноо: " +
+          formatDate(user.acknowledged_at) +
+          (user.status === "deleted" ? " (хуучин бүртгэл)" : "");
+        item.appendChild(date);
+      }
+
+      box.appendChild(item);
+    });
+
+    list.appendChild(box);
+  });
+
+  if (visibleCount === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-report";
+    empty.textContent = "Таны хайлт, сонгосон шүүлтүүрт тохирох ажилтан олдсонгүй.";
+    list.appendChild(empty);
+  }
+}
+
+// EXCEL-Д НЭЭХ CSV ТАЙЛАН ТАТАХ
+function downloadPendingCSV() {
+  if (!pendingReportData.length) {
+    alert("Татах тайлан байхгүй байна. Эхлээд тайлангаа шинэчилнэ үү.");
+    return;
+  }
+
+  const rows = [
+    [
+      "Мэдээллийн төрөл",
+      "Мэдээллийн гарчиг",
+      "Ажилтны нэр",
+      "Байгууллага",
+      "Утасны дугаар",
+      "Төлөв",
+      "Танилцсан огноо"
+    ]
+  ];
+
+  function safeCell(value) {
+    let text = String(value ?? "");
+    if (/^[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  pendingReportData.forEach(report => {
+    report.users.forEach(user => {
+      rows.push([
+        report.post.category,
+        report.post.title,
+        user.fullname,
+        user.organization || "",
+        user.phone,
+        user.acknowledged ? "Танилцсан" : "Танилцаагүй",
+        user.acknowledged ? formatDate(user.acknowledged_at) : ""
+      ]);
+    });
+  });
+
+  const csv = "\uFEFF" + rows
+    .map(row => row.map(safeCell).join(","))
+    .join("\r\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "VCHD3_taniltsan_tailan_" +
+    new Date().toISOString().slice(0, 10) + ".csv";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  URL.revokeObjectURL(url);
 }
 
 // ӨМНӨ НЭВТЭРСЭН ЭСЭХИЙГ ШАЛГАХ
