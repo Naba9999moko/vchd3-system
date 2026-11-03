@@ -92,7 +92,7 @@ async function setupDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       fullname TEXT NOT NULL,
-      phone TEXT UNIQUE NOT NULL,
+      phone TEXT NOT NULL,
       password TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'employee',
       status TEXT NOT NULL DEFAULT 'pending',
@@ -100,11 +100,45 @@ async function setupDatabase() {
     )
   `);
 
-  // БАЙГУУЛЛАГА / ХЭСГИЙН НЭР НЭМЭХ
-  // Өмнө бүртгүүлсэн хэрэглэгчдийн мэдээллийг устгахгүй.
   await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS organization TEXT NOT NULL DEFAULT ''
+  `);
+
+  // ХУУЧИН УТАСНЫ ДУГААРЫН UNIQUE CONSTRAINT-ИЙГ АРИЛГАХ
+  await pool.query(`
+    DO $$
+    DECLARE
+      constraint_record RECORD;
+      phone_attnum SMALLINT;
+    BEGIN
+      SELECT attnum INTO phone_attnum
+      FROM pg_attribute
+      WHERE attrelid = 'users'::regclass
+        AND attname = 'phone'
+        AND NOT attisdropped;
+
+      FOR constraint_record IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'users'::regclass
+          AND contype = 'u'
+          AND array_length(conkey, 1) = 1
+          AND conkey[1] = phone_attnum
+      LOOP
+        EXECUTE format(
+          'ALTER TABLE users DROP CONSTRAINT %I',
+          constraint_record.conname
+        );
+      END LOOP;
+    END $$;
+  `);
+
+  // ЗӨВХӨН УСТГААГҮЙ БҮРТГЭЛҮҮДИЙН ДУГААР ДАВХАРДАХГҮЙ
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_active_phone_unique
+    ON users(phone)
+    WHERE status <> 'deleted'
   `);
 
   await pool.query(`
@@ -124,7 +158,8 @@ async function setupDatabase() {
     NOT NULL DEFAULT '[]'::jsonb
   `);
 
-  // ТАНИЛЦСАН БҮРТГЭЛ
+  // ТАНИЛЦСАН ТҮҮХ
+  // Хэрэглэгчийг физикээр устгахгүй тул энэ түүх хадгалагдана.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS post_acknowledgements (
       id SERIAL PRIMARY KEY,
@@ -137,6 +172,7 @@ async function setupDatabase() {
     )
   `);
 
+  // ҮНДСЭН АДМИН
   const adminPhone = process.env.ADMIN_PHONE?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -147,7 +183,11 @@ async function setupDatabase() {
   const hash = await bcrypt.hash(adminPassword, 12);
 
   const existing = await pool.query(
-    "SELECT id FROM users WHERE phone = $1",
+    `SELECT id
+     FROM users
+     WHERE phone = $1 AND status <> 'deleted'
+     ORDER BY id DESC
+     LIMIT 1`,
     [adminPhone]
   );
 
@@ -169,46 +209,140 @@ async function setupDatabase() {
        SET role = 'superadmin',
            status = 'approved',
            password = $1
-       WHERE phone = $2`,
-      [hash, adminPhone]
+       WHERE id = $2`,
+      [hash, existing.rows[0].id]
     );
   }
 
   console.log("Өгөгдлийн сан бэлэн боллоо.");
 }
 
-// ЭРХ ШАЛГАХ
-function requireLogin(req, res, next) {
+// НЭВТЭРСЭН ХЭРЭГЛЭГЧИЙН ЭРХ ШАЛГАХ
+async function requireLogin(req, res, next) {
   if (!req.session.user) {
     return res.status(401).json({
       message: "Нэвтэрнэ үү."
     });
   }
-  next();
-}
 
-function requireAdmin(req, res, next) {
-  if (
-    !req.session.user ||
-    !["admin", "superadmin"].includes(req.session.user.role)
-  ) {
-    return res.status(403).json({
-      message: "Админы эрх шаардлагатай."
+  try {
+    const result = await pool.query(
+      `SELECT id, fullname, phone, organization, role, status
+       FROM users
+       WHERE id = $1`,
+      [req.session.user.id]
+    );
+
+    if (
+      !result.rowCount ||
+      result.rows[0].status !== "approved"
+    ) {
+      return req.session.destroy(() => {
+        res.clearCookie("connect.sid");
+        res.status(401).json({
+          message: "Таны бүртгэл идэвхгүй болсон байна. Дахин нэвтэрнэ үү."
+        });
+      });
+    }
+
+    const user = result.rows[0];
+
+    req.session.user = {
+      id: user.id,
+      fullname: user.fullname,
+      phone: user.phone,
+      organization: user.organization || "",
+      role: user.role
+    };
+
+    next();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Хэрэглэгч шалгахад алдаа гарлаа."
     });
   }
-  next();
 }
 
-function requireSuperAdmin(req, res, next) {
-  if (
-    !req.session.user ||
-    req.session.user.role !== "superadmin"
-  ) {
-    return res.status(403).json({
-      message: "Үндсэн админы эрх шаардлагатай."
+// АДМИНЫ ЭРХ ШАЛГАХ
+async function requireAdmin(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({
+      message: "Нэвтэрнэ үү."
     });
   }
-  next();
+
+  try {
+    const result = await pool.query(
+      `SELECT id, fullname, phone, organization, role, status
+       FROM users
+       WHERE id = $1`,
+      [req.session.user.id]
+    );
+
+    if (
+      !result.rowCount ||
+      result.rows[0].status !== "approved" ||
+      !["admin", "superadmin"].includes(result.rows[0].role)
+    ) {
+      return res.status(403).json({
+        message: "Админы эрх шаардлагатай."
+      });
+    }
+
+    const user = result.rows[0];
+
+    req.session.user = {
+      id: user.id,
+      fullname: user.fullname,
+      phone: user.phone,
+      organization: user.organization || "",
+      role: user.role
+    };
+
+    next();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Эрх шалгахад алдаа гарлаа."
+    });
+  }
+}
+
+// ҮНДСЭН АДМИНЫ ЭРХ ШАЛГАХ
+async function requireSuperAdmin(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({
+      message: "Нэвтэрнэ үү."
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT role, status
+       FROM users
+       WHERE id = $1`,
+      [req.session.user.id]
+    );
+
+    if (
+      !result.rowCount ||
+      result.rows[0].status !== "approved" ||
+      result.rows[0].role !== "superadmin"
+    ) {
+      return res.status(403).json({
+        message: "Үндсэн админы эрх шаардлагатай."
+      });
+    }
+
+    req.session.user.role = "superadmin";
+    next();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Эрх шалгахад алдаа гарлаа."
+    });
+  }
 }
 
 // БҮРТГЭЛ
@@ -228,27 +362,43 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
+    const cleanPhone = phone.trim();
+
+    const existing = await pool.query(
+      `SELECT id
+       FROM users
+       WHERE phone = $1 AND status <> 'deleted'
+       LIMIT 1`,
+      [cleanPhone]
+    );
+
+    if (existing.rowCount > 0) {
+      return res.status(409).json({
+        message: "Энэ утасны дугаартай идэвхтэй бүртгэл байна."
+      });
+    }
+
     const hash = await bcrypt.hash(password, 12);
 
     await pool.query(
       `INSERT INTO users
-       (fullname, phone, password, organization)
-       VALUES ($1, $2, $3, $4)`,
+       (fullname, phone, password, organization, role, status)
+       VALUES ($1, $2, $3, $4, 'employee', 'pending')`,
       [
         fullname.trim(),
-        phone.trim(),
+        cleanPhone,
         hash,
         organization.trim()
       ]
     );
 
     res.json({
-      message: "Бүртгэл амжилттай. Админы зөвшөөрлийг хүлээнэ үү."
+      message: "Шинэ бүртгэл амжилттай. Админы зөвшөөрлийг хүлээнэ үү."
     });
   } catch (error) {
     if (error.code === "23505") {
       return res.status(409).json({
-        message: "Энэ утасны дугаар бүртгэлтэй байна."
+        message: "Энэ утасны дугаартай идэвхтэй бүртгэл байна."
       });
     }
 
@@ -265,8 +415,18 @@ app.post("/api/login", async (req, res) => {
     const phone = req.body.phone?.trim();
     const { password } = req.body;
 
+    if (!phone || !password) {
+      return res.status(400).json({
+        message: "Утасны дугаар болон нууц үгээ оруулна уу."
+      });
+    }
+
     const result = await pool.query(
-      "SELECT * FROM users WHERE phone = $1",
+      `SELECT *
+       FROM users
+       WHERE phone = $1 AND status <> 'deleted'
+       ORDER BY id DESC
+       LIMIT 1`,
       [phone]
     );
 
@@ -277,7 +437,7 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = result.rows[0];
-    const valid = await bcrypt.compare(password || "", user.password);
+    const valid = await bcrypt.compare(password, user.password);
 
     if (!valid) {
       return res.status(401).json({
@@ -344,9 +504,9 @@ app.post("/api/logout", (req, res) => {
 });
 
 // ОДОО НЭВТЭРСЭН ХЭРЭГЛЭГЧ
-app.get("/api/me", (req, res) => {
+app.get("/api/me", requireLogin, (req, res) => {
   res.json({
-    user: req.session.user || null
+    user: req.session.user
   });
 });
 
@@ -363,6 +523,7 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
          status,
          created_at
        FROM users
+       WHERE status <> 'deleted'
        ORDER BY created_at DESC`
     );
 
@@ -389,7 +550,9 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     const result = await pool.query(
       `UPDATE users
        SET status = $1
-       WHERE id = $2 AND role = 'employee'
+       WHERE id = $2
+         AND role = 'employee'
+         AND status <> 'deleted'
        RETURNING id`,
       [status, req.params.id]
     );
@@ -407,6 +570,45 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Төлөв шинэчлэхэд алдаа гарлаа."
+    });
+  }
+});
+
+// АЖИЛТНЫ БҮРТГЭЛ ЗӨӨЛНӨӨР УСТГАХ
+// Танилцсан түүх болон хуучин хэрэглэгчийн мэдээлэл хадгалагдана.
+app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({
+        message: "Хэрэглэгчийн дугаар буруу байна."
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET status = 'deleted'
+       WHERE id = $1
+         AND role = 'employee'
+         AND status <> 'deleted'
+       RETURNING id`,
+      [userId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({
+        message: "Устгах ажилтны бүртгэл олдсонгүй. Админ болон Үндсэн админы бүртгэлийг энэ үйлдлээр устгах боломжгүй."
+      });
+    }
+
+    res.json({
+      message: "Ажилтны бүртгэлийг устгалаа. Танилцсан түүх хадгалагдсан."
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Ажилтны бүртгэл устгахад алдаа гарлаа."
     });
   }
 });
@@ -680,6 +882,7 @@ app.post(
 );
 
 // АДМИН ТАНИЛЦСАН / ТАНИЛЦААГҮЙ АЖИЛТНУУДЫГ ХАРАХ
+// УСТГАСАН ХЭРЭГЛЭГЧИЙГ ЗӨВХӨН ТАНИЛЦСАН ТАЙЛАНД ХАРУУЛНА.
 app.get(
   "/api/posts/:id/acknowledgements",
   requireAdmin,
@@ -710,6 +913,7 @@ app.get(
            u.fullname,
            u.phone,
            u.organization,
+           u.status,
            a.acknowledged_at,
            (a.id IS NOT NULL) AS acknowledged
          FROM users u
@@ -717,7 +921,10 @@ app.get(
            ON a.user_id = u.id
            AND a.post_id = $1
          WHERE u.role = 'employee'
-           AND u.status = 'approved'
+           AND (
+             u.status = 'approved'
+             OR (u.status = 'deleted' AND a.id IS NOT NULL)
+           )
          ORDER BY u.organization ASC, u.fullname ASC`,
         [postId]
       );
@@ -762,9 +969,23 @@ app.get(
   requireLogin,
   async (req, res) => {
     try {
+      const postId = Number(req.params.id);
+      const index = Number(req.params.index);
+
+      if (
+        !Number.isInteger(postId) ||
+        postId <= 0 ||
+        !Number.isInteger(index) ||
+        index < 0
+      ) {
+        return res.status(400).json({
+          message: "Файлын мэдээлэл буруу байна."
+        });
+      }
+
       const result = await pool.query(
         "SELECT attachments FROM posts WHERE id = $1",
-        [req.params.id]
+        [postId]
       );
 
       if (!result.rowCount) {
@@ -774,13 +995,8 @@ app.get(
       }
 
       const attachments = result.rows[0].attachments || [];
-      const index = Number(req.params.index);
 
-      if (
-        !Number.isInteger(index) ||
-        index < 0 ||
-        index >= attachments.length
-      ) {
+      if (index >= attachments.length) {
         return res.status(404).json({
           message: "Файл олдсонгүй."
         });
